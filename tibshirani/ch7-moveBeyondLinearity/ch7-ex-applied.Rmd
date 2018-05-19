@@ -1,0 +1,158 @@
+---
+title: "ch7-ex-applied"
+author: "S Zimine"
+date: "12/5/2017"
+output: html_document
+---
+
+
+### Ex 6
+#### 6.a
+From Asad solution
+
+```{r}
+library(ISLR)
+library(boot)
+
+dfmax <- 10
+kcv <- 10
+all.deltas <- rep(NA, dfmax)
+for (i in 1:dfmax) {
+  glm.fit <- glm(wage~poly(age, i,raw=TRUE), data=Wage)
+  all.deltas[i] = cv.glm(Wage, glm.fit, K=kcv)$delta[2]
+}
+
+plot(1:dfmax, all.deltas, xlab="Degree", ylab="CV error", type="l", pch=20, lwd=2, main="test MSE as a function of polynomial degree in wage~poly(wage,i)")
+min.point = min(all.deltas)
+sd.points = sd(all.deltas)
+abline(h=min.point + 0.2 * sd.points, col="red", lty="dashed")
+abline(h=min.point - 0.2 * sd.points, col="red", lty="dashed")
+legend("topright", "0.2-standard deviation lines", lty="dashed", col="red")
+```
+
+The plot indicates that $df=3$ is a minimal degrees of freedom with a small enough test MSE.
+
+Lets compare it with `anova()` results.
+
+```{r}
+fit1 <- lm(wage~poly(age,1,raw=TRUE),data=Wage)
+fit2 <- lm(wage~poly(age,2,raw=TRUE),data=Wage)
+fit3 <- lm(wage~poly(age,3,raw=TRUE),data=Wage)
+fit4 <- lm(wage~poly(age,4,raw=TRUE),data=Wage)
+fit5 <- lm(wage~poly(age,5,raw=TRUE),data=Wage)
+fit6 <- lm(wage~poly(age,6,raw=TRUE),data=Wage)
+fit7 <- lm(wage~poly(age,7,raw=TRUE),data=Wage)
+fit8 <- lm(wage~poly(age,8,raw=TRUE),data=Wage)
+fit9 <- lm(wage~poly(age,9,raw=TRUE),data=Wage)
+
+anova(fit1,fit2,fit3,fit4,fit5,fit6,fit7,fit8,fit9)
+```
+`anova()` also shows that the minimul number of degree of freedom is 3.
+
+Plot the fit with the determined number of $df$.
+```{r}
+agelims=range(Wage$age)
+age.grid=seq(from=agelims[1],to=agelims[2])
+
+fit<- glm(wage~poly(age,3,raw=T),data=Wage)
+pred <- predict(fit, newdata=list(age=age.grid),se=TRUE)
+se.bands <- cbind(pred$fit+2*pred$se  , pred$fit-2*pred$se )
+
+plot(Wage$age,Wage$wage, main="Wage vs age with df=3", col="darkgray", pch=20, cex=0.7 )
+lines(age.grid, pred$fit, lwd=2, col="blue")
+matlines(age.grid, se.bands,col="blue", lty=2)    
+```
+
+### 6.b
+
+```{r}
+cutmax <- 10
+all.cvs = rep(NA, cutmax)
+for (i in 2:10) {
+  Wage$age.cut = cut(Wage$age, i)
+  lm.fit = glm(wage~age.cut, data=Wage)
+  all.cvs[i] = cv.glm(Wage, lm.fit, K=10)$delta[2]
+}
+plot(2:10, all.cvs[-1], xlab="Number of cuts", ylab="CV error", type="l", pch=20, lwd=2)
+```
+
+Number of cuts is 8
+
+```{r}
+fit <- glm(wage~cut(age,8), data=Wage)
+preds <- predict(fit, newdata=list(age=age.grid))
+plot(wage~age, data=Wage, col="darkgrey", cex=0.8)
+lines(age.grid, preds,  lwd=2,col="blue")
+```
+
+### Ex 7
+
+```{r}
+plot(wage~maritl, data=Wage)
+plot(wage~jobclass, data=Wage)
+```
+
+From plots it appears a married couple makes more money on average than other groups. It
+also appears that Informational jobs are higher-wage than Industrial jobs on
+average.
+
+
+
+#### gams
+```{r}
+require(gam)
+gam1<- gam(wage~maritl+jobclass+s(age,df=4), data=Wage)
+par( mfrow=c(1,3))
+plot(gam1,se=TRUE)
+```
+
+#### Polynomial and Step functions
+```{r 7.2}
+fit = lm(wage~maritl, data=Wage)
+deviance(fit)
+fit = lm(wage~jobclass, data=Wage)
+deviance(fit)
+fit = lm(wage~maritl+jobclass, data=Wage)
+deviance(fit)
+```
+
+### Ex 8
+
+The flollow variables were identified as having non-linear relationship
+```{r}
+data(Auto)
+par(mfrow=c(2,3))
+plot(mpg~displacement, data=Auto)
+plot(mpg~horsepower, data=Auto, cex=0.6)
+plot(mpg~weight, data=Auto, cex=0.6)
+plot(mpg~acceleration, data=Auto, cex=0.6)
+plot(mpg~cylinders, data=Auto, cex=0.6)
+```
+
+Lets examine `cylinders`
+```{r}
+# polynomial regression
+maxpd <-4
+all.deltas = rep(NA, maxpd)
+for (i in 1:maxpd) {
+  glm.fit = glm(mpg~poly(cylinders, i), data=Auto)
+  all.deltas[i] = cv.glm(Auto, glm.fit, K=10)$delta[2]
+}
+plot(1:maxpd, all.deltas, xlab="Degree", ylab="CV error", type="l", pch=20, lwd=2)
+
+cylr <- range(Auto$cylinders)
+cyl.grid <-seq(from=cylr[1], to=cylr[2])
+
+cy.fit = glm(mpg~poly(cylinders, 3), data=Auto) # 
+cy.preds <- predict(cy.fit, newdata=list(cylinders=cyl.grid),se=TRUE)
+cy.se.bands=cbind(cy.preds$fit+2*cy.preds$se.fit ,cy.preds$fit-2*cy.preds$se.fit )
+
+plot(mpg~cylinders,data=Auto)
+lines(cyl.grid,cy.preds$fit,lwd=2,col="blue")
+matlines(cyl.grid,cy.se.bands,lwd=1,col="blue",lty=3)
+```
+
+
+
+
+

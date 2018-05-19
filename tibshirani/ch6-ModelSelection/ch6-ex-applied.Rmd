@@ -1,0 +1,522 @@
+---
+title: "ch6-ex-applied"
+author: "S Zimine"
+date: "12/4/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Ex 8 (Applied )
+===============
+
+### a)
+```{r}
+set.seed(1)
+n<-100
+x<-rnorm(n)
+epsilon <-rnorm(n)
+```
+
+### b)
+```{r}
+beta0<- 3
+beta1<- 2
+beta2<- -3
+beta3<- 0.3
+
+y<-beta0 + beta1*x + beta2*x^2 + beta3*x^3 + epsilon
+head(y)
+```
+
+### c)
+
+```{r}
+require(leaps)
+
+dataset <- data.frame(y,x,x^2,x^3,x^4,x^5,x^6,x^7,x^8,x^9,x^10)
+colnames(dataset) <- c("response", "x1", "x2", "x3", "x4", "x5"
+					  ,"x6", "x7", "x8", "x9", "x10")
+p_feats<-dim(dataset)[2] -1  ## on all 10 features.
+regfit.full<-regsubsets(response~., data=dataset, nvmax=p_feats)
+reg.summary<-summary(regfit.full)
+print(reg.summary)
+
+```
+
+Lets define a function  to plot Cp, BIC and ajusted R squared
+
+```{r}
+plot_regularization_measures<-function(model, label="best subset") {
+	model.summary <- summary(model)
+	xlbl <- paste(label, ": #params")
+	par(mfrow=c(2,2))
+	plot(model.summary$rss ,xlab=xlbl,ylab="RSS",type="l")
+    #adjusted r squared
+	plot(model.summary$adjr2, xlab=xlbl,ylab="Adjusted RSq", type="l")
+	idx1<-which.max(model.summary$adjr2)
+	points(idx1, model.summary$adjr2[idx1],col="red", cex=1, pch=20)
+    #CP
+	plot(model.summary$cp, xlab=xlbl,ylab="Cp", type="l")
+	idx2<-which.min(model.summary$cp)
+	points(idx2, model.summary$cp[idx2],col="red", cex=1, pch=20)
+    #BIC
+	plot(model.summary$bic, xlab=xlbl,ylab="BIC", type="l")
+	idx3<-which.min(model.summary$bic)
+	points(idx3, model.summary$bic[idx3],col="red", cex=1, pch=20)
+    par(mfrow=c(1,1)) 
+}
+### lets plot this measures for best subset selection
+plot_regularization_measures(model=regfit.full)
+```
+
+We observet that all Cp, BIC and $R^2_{adj}$ show that the best model has 3 parameters. Lets plot its coefficients to see if they match the true model betas.
+
+```{r}
+print(coefficients(regfit.full , id=3))
+```
+
+The alternative way to define the model is by using `poly()` function (Asad solution)
+
+```{r}
+dataset_same = data.frame("y" = y, "x" = x)
+regfit.full_b = regsubsets(y~poly(x, 10, raw=T), data=dataset_same, nvmax=p_feats)
+model.summary <- summary(regfit.full_b)
+#which model is best
+print(paste( "min cp: ",which.min(model.summary$cp)
+            ,"min bic: ",which.min(model.summary$bic)
+            , "max adj r^2:",which.max(model.summary$adjr2)))
+```
+
+### d)
+##### Forward step selection
+```{r}
+regfit.fwd<-regsubsets(response~., data=dataset, nvmax=p_feats, method="forward")
+reg.summary<-summary(regfit.fwd)
+
+plot_regularization_measures(model=regfit.fwd, label="forward selection")
+```
+
+We obtain the best model for the same number of params: 3. Coefficients are identical to those of best subset selection model.
+
+```{r}
+print(coefficients(regfit.fwd , id=3))
+```
+##### Backward step selection
+```{r}
+regfit.bwd<-regsubsets(response~., data=dataset, nvmax=p_feats, method="backward")
+reg.summary<-summary(regfit.bwd)
+
+plot_regularization_measures(model=regfit.bwd, label="backward selection")
+print(coefficients(regfit.bwd , id=3))
+```
+For backward and forward selection results are identical as for best subset selection. Coefficients are close to those obtained by forward selection model.
+
+### e)
+##### LASSO
+```{r}
+require(glmnet)
+
+xv <- model.matrix(response~., data=dataset)[,-1]
+yv <- dataset$response
+set.seed(1)
+grid <- 10^seq(10,-2,length=100)
+
+## cross validation to select optimal lambda
+cv.out <- cv.glmnet(xv, yv, alpha=1 ) #alpha=1 - lasso
+bestlambda <- cv.out$lambda.min 
+print(paste("lasso cv best lambda:",bestlambda))
+
+plot(cv.out)
+##fit lasso model on all data
+lasso.mod <- glmnet(xv,yv, alpha=1, lambda=grid, thresh=1e-12)
+lasso.pred <- predict(lasso.mod, s=bestlambda, type="coefficients")
+print(lasso.pred)
+```
+
+We observe that coefficents x0, x1 and x2 match closely the betas of the real Y function".
+
+The alternative way to define the lasso model is by using `poly()` function (Asad solution)
+
+```{r}
+xmat = model.matrix(y~poly(x, 10, raw=T), data=dataset_same)[, -1]
+mod.lasso = cv.glmnet(xmat, y, alpha=1)
+best.lambda = mod.lasso$lambda.min
+best.lambda
+lasso.model = glmnet(xmat, y, alpha=1)
+best.pred <- predict(lasso.model, s=best.lambda, type="coefficients")
+print(best.pred)
+```
+
+As we see this approach computes coefficients which are slightly better.
+
+### f)
+
+**Best Subset selection**
+
+```{r}
+beta7 <- 7
+y <- beta0 + beta7 * x^7 + epsilon
+dataset2 <- data.frame("y" = y, "x" = x)
+regfit.full<-regsubsets(y~poly(x,7,raw=TRUE), data=dataset2, nvmax=7)
+
+plot_regularization_measures(model=regfit.full, label="best subset dataset2")
+
+print(coefficients(regfit.full, id=1))
+print(coefficients(regfit.full, id=2))
+print(coefficients(regfit.full, id=4))
+```
+
+We observe that model with 1 predictor picked by BIC is the most accurate.
+
+**Lasso**
+
+```{r}
+xmat = model.matrix(y~poly(x, 7, raw=T), data=dataset2)[, -1]
+cv.lasso <- cv.glmnet(xmat, y, alpha=1)
+plot(cv.lasso)
+bestlambda <- cv.lasso$lambda.min 
+print(paste("best lambda:", bestlambda))
+lasso.mod <- glmnet(xmat, y, alpha=1, lambda=grid, thresh=1e-12)
+lasso.pred <- predict(lasso.mod, s=bestlambda, type="coefficients")
+print(lasso.pred)
+```
+We observe that lasso's coefficients are close the betas of real model, interecept is quite off from 3.0.
+
+
+Ex 9 (Applied )
+===============
+```{r}
+rm(list=ls()) #clean all variables
+```
+
+### a)
+
+```{r}
+require(ISLR)
+data(College)
+dim(College)
+```
+
+Split the dataset into train and test half - half. 
+```{r}
+set.seed(11)
+full_idx <- 1:nrow(College)
+train <- sample(full_idx, length(full_idx)/2 )
+test <- full_idx[-train]
+```
+
+### b)
+##### Linear model (OLS)
+
+```{r}
+
+lm.mod <- lm(Apps~., data=College, subset=train)
+summary(lm.mod)
+y<-College$Apps
+lm.pred <- predict(lm.mod, College[test,])
+mse_lm <- mean( (y[test] -lm.pred)^2 )
+paste("test MSE linear model: ",mse_lm)
+```
+
+### c) 
+##### Ridge 
+```{r}
+full.mat <- model.matrix(Apps~., data=College)
+train.mat <- model.matrix(Apps~., data=College[train,])
+test.mat <- model.matrix(Apps~., data=College[test,])
+y.train <- y[train]
+y.test <- y[test]
+
+grid <- 10^seq(10,-2,length=100)
+
+ridge.cv <- cv.glmnet(train.mat, y.train, alpha=0, lambda=grid, thresh=1e-12)
+bestlam <- ridge.cv$lambda.min
+paste("cv Ridge best lambda:",bestlam)
+
+ridge.pred <- predict(ridge.cv, s=bestlam, newx=test.mat)
+mse_ridge_best <- mean((ridge.pred-y.test)^2)
+print(paste("test MSE  ridge model: ",mse_ridge_best))
+```
+
+### d)
+####### Lasso
+```{r}
+
+lasso.cv <- cv.glmnet(train.mat, y.train, alpha=1 , lambda=grid, thresh=1e-12) #lasso on train
+bestlam <- lasso.cv$lambda.min 
+print(paste("cv Lasso best lambda:",bestlam))
+
+lasso.pred <- predict(lasso.cv, s=bestlam, newx=test.mat)
+mse_lasso_best <- mean((lasso.pred-y.test)^2)
+print(paste("test MSE  lasso model: ",mse_lasso_best))
+
+lasso.mod <- glmnet(full.mat, y, alpha=1) #on full data
+lasso.coefs <-predict(lasso.mod,s=bestlam, type="coefficients")
+print(lasso.coefs)
+```
+
+### e)
+##### PCR
+
+```{r}
+library(pls)
+
+pcr.fit <- pcr(Apps~. ,data=College,subset=train,scale=TRUE, validation="CV")
+validationplot(pcr.fit, val.type="MSEP")
+pcr.pred <- predict(pcr.fit, College[test,], ncomp=9)
+mse_pcr <- mean( (pcr.pred - y.test)^2 )
+print(paste("test MSE  PCR ncomp=9: ",mse_pcr))
+
+```
+
+### f) 
+##### PLS 
+```{r}
+pls.fit <- plsr(Apps~. ,data=College,subset=train
+	           ,scale=TRUE, validation="CV")
+validationplot(pls.fit, val.type="MSEP")
+pls.pred <- predict(pls.fit, College[test,], ncomp=7)
+mse_pls <- mean( (pls.pred - y.test)^2 )
+print(paste("test MSE  PLS ncomp=7: ",mse_pls))
+```
+
+### g)
+
+Fom the values of test MSEs, all models have comparable predictive power. Lets compare R-squared of all 5 models 
+
+```{r}
+test.avg <- mean(College[test,]$Apps)
+tss <- mean( (y.test  - test.avg)^2)
+lm.test.r2 <-    1 - mse_lm / tss 
+ridge.test.r2 <- 1 - mse_ridge_best / tss 
+lasso.test.r2 <- 1 - mse_lasso_best / tss 
+pcr.test.r2 <-   1 - mse_pcr /tss 
+pls.test.r2  <-  1 - mse_pls / tss 
+
+barplot(c(lm.test.r2, ridge.test.r2, lasso.test.r2, pcr.test.r2, pls.test.r2)
+		,col=2, names.arg=c("OLS", "Ridge", "Lasso", "PCR", "PLS")
+		,main="Test R-squared")
+
+```
+
+Ex 10 (Applied )
+===============
+```{r}
+rm(list=ls())
+```
+### a)
+```{r}
+set.seed(1)
+p<-20
+n<-1000
+X = matrix(rnorm(n*p), n, p)
+B = rnorm(p)
+#set some values of B to zero
+B[3] = 0
+B[4] = 0
+B[9] = 0
+B[19] = 0
+B[10] = 0
+eps = rnorm(p)
+
+Y <- X%*% B + eps 
+```
+
+### b)
+```{r}
+full_idx <- 1:nrow(X)
+train <- sample(full_idx, length(full_idx) * 1/10 ,replace=FALSE)  # train 1/10 th of data
+test <- full_idx[-train] 
+```
+
+### c)
+#### training MSE
+```{r}
+library(leaps)
+datas <- data.frame(Y,X)
+p_feats <- dim(datas)[2]-1 ## all features
+regbsub <- regsubsets(Y~., data=datas[train,], nvmax=p)
+regbsum <- summary(regbsub)
+
+plot( regbsum$rss/ length(train),xlab="Number of Variables ",ylab="training MSE",
+type="b", pch=19,main="Best subset select")
+
+```
+
+The manual calculation of training MSE
+
+```{r}
+x.train <- datas[train,-1]
+y.train <- datas[train,"Y"]
+x.test <- datas[test,-1]
+y.test <- datas[test,"Y"]
+
+val.errors <- rep(NA,p)
+
+x_cols <- colnames(datas)[-1]
+for(i in 1:p){
+	coefi <- coef(regbsub, id=i)
+	pred <- as.matrix( x.train[,x_cols %in% names(coefi)]) %*% coefi[names(coefi) %in% x_cols ]
+	val.errors[i] <- mean((y.train - pred)^2)
+}
+
+regbsum$rss/ length(train)
+val.errors
+plot(val.errors, ylab="Training MSE", pch=19, type="b")
+```
+
+Training MSE decreases monotoniously with a growing complexity of the model.
+
+### d)
+#### Test MSE
+```{r}
+val.t.errors <- rep(NA,p)
+
+for(i in 1:p){
+	coefi <- coef(regbsub, id=i)
+	pred <- as.matrix( x.test[,x_cols %in% names(coefi)]) %*% coefi[names(coefi) %in% x_cols ]
+	val.t.errors[i] <- mean((y.test - pred)^2)
+}
+plot(val.t.errors,ylab="test MSE", xlab="Number of variables", type="b", pch=19, main="Best subset select")
+idx <- which.min(val.t.errors)
+points(idx, val.t.errors[idx], col="red", pch=20)
+```
+
+### e)
+
+As seen on a previous chart the lowest test MSE is obtained for model with 16 params. We observet that test MSE can increase with a growing complexity of a model.
+
+### f)
+##### Compare model coefficients with true betas
+
+```{r}
+print(B)
+print( coef(regbsub,id=16) )
+```
+
+All zero coefficidents are found except X19.
+
+
+### g)
+```{r}
+beta.errors <- rep(NA, p)
+a <- rep(NA,p)
+b <- rep(NA,p)
+for (i in 1:p){
+	coefi <- coef(regbsub,id=i)
+	a[i] <- length(coefi)-1  # number of model params minus intercept
+	b[i] <-  sqrt(sum( (B[x_cols %in% names(coefi)] - coefi[ names(coefi) %in% x_cols ] )^2) +
+                  sum(B[!(x_cols %in% names(coefi))])^2) 
+}
+plot(x=a, y=b, xlab="number of coefs", ylab="coefficients residual error" )
+
+
+print(which.min(b))
+```
+
+As seen on the chart above model with 9 coefficients (10 with intercept) or 6 coefficients (7 with intercept) minimizes the error between the 
+estimated and true coefficients. Test error is minimized with 16 parameter model.
+A better fit of true coefficients as measured here doesn't mean the model will have
+a lower test MSE.
+
+
+Ex 11 (Applied )
+===============
+```{r}
+rm(list=ls())
+set.seed(1)
+library(MASS)
+library(leaps)
+library(glmnet)
+
+data(Boston)
+```
+
+### a)
+##### Best subset selection model with k-fold validation
+
+```{r}
+# define predict for bset subset selection function (to compute test mse)
+predict.regsubsets = function(object, newdata, id, ...) {
+    form = as.formula(object$call[[2]])
+    mat = model.matrix(form, newdata)
+    coefi = coef(object, id = id)
+    mat[, names(coefi)] %*% coefi
+}
+
+k<-10  #k-fold validation
+p <- ncol(Boston)-1
+
+folds<-sample(rep(1:k, length=nrow(Boston)) )
+#print(table(folds))
+
+cv.errors <- matrix(NA,k,p)
+
+#loop on k folds
+for (j in 1:k){
+	best.fit <- regsubsets(crim~. ,data=Boston[folds!=j,], nvmax =p) #on train
+	for (i in 1:p){
+		pred <- predict.regsubsets(best.fit, Boston[folds==j,], id=i  ) #predictions of ith model
+		cv.errors[j,i] <- mean( (pred - Boston$crim[folds==j] )^2 )
+	}
+}
+rmse.cv <- sqrt(apply(cv.errors, 2, mean))
+
+plot(rmse.cv, type="b", pch=19,main="X-validation curve for best subset", xlab="# params"
+	 ,ylab="RMSE")
+
+
+min_pars <- which.min(rmse.cv)
+
+bestsub_coefs <- coefficients(best.fit,id=min_pars)
+print(bestsub_coefs)
+
+rmse.cv.bestsubset <- rmse.cv[min_pars]
+print(paste("best subset min rmse:",rmse.cv.bestsubset))
+```
+#### Lasso 
+
+```{r}
+x <- model.matrix(crim~.-1,data=Boston)
+y <- Boston$crim 
+cv.lasso <- cv.glmnet(x,y,type.measure="mse",alpha=1) 
+plot(cv.lasso)
+print(coef(cv.lasso))
+rmse.cv.lasso <- sqrt(cv.lasso$cvm[cv.lasso$lambda == cv.lasso$lambda.1se])
+print(paste("lasso min rmse:",rmse.cv.lasso))
+```
+
+#### Ridge 
+
+```{r}
+cv.ridge <- cv.glmnet(x,y,type.measure="mse",alpha=0)
+plot(cv.ridge)
+print(coef(cv.ridge))
+rmse.cv.ridge <- sqrt(cv.ridge$cvm[ cv.ridge$lambda == cv.ridge$lambda.1se ] )
+print(paste("ridge min rmse:",rmse.cv.ridge))
+```
+
+#### PCR
+```{r}
+library(pls)
+pcr.fit <- pcr(crim~., data=Boston,scale=TRUE, validation="CV")
+validationplot(pcr.fit, val.type="RMSEP")
+print(summary(pcr.fit))
+```
+
+#### b)
+
+Compare RMSEs of the model
+```{r}
+rmse.cv.bestsubset
+rmse.cv.lasso
+rmse.cv.ridge
+```
+
+#### c)
+
+Lowest RMSE is from PCR on all 13 predictors.  RMSE of best subset model selection with 9 params is close to the onf of PCR  but it is a simpler model. Thus it is better to chose the best subset selection model. 

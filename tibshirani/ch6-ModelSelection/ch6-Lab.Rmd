@@ -1,0 +1,383 @@
+---
+title: "ISLR Chapter 6 Labs on Model Selection and Regularization"
+author: "S Zimine"
+date: "11/13/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Lab 1: Subset Selection Methods
+================================
+
+```{r cars}
+library(ISLR)
+data(Hitters)
+names(Hitters)
+```
+We use the dataset Hitters containing features about baseball players and wish  to predict the player's `Salary`.
+
+## Data Cleaning
+
+We first need to check if we should clean the data.  Checking for NA occurencies in data.
+```{r}
+dim(Hitters)
+sum(is.na(Hitters$Salary))
+```
+We do have  missing `Salary` points. So lets clean the dataset.
+```{r}
+Hitters <- na.omit(Hitters)
+dim(Hitters)
+sum(is.na(Hitters))
+```
+
+## Best Subset Selection
+Use `regsubsets()` func from `leaps` package to perform  best Subsets selection. We can do since our number of features is `r -1+dim(Hitters)[2]`.
+
+Doing best subset selection on the full dataset.
+```{r}
+library(leaps)
+p_features<- dim(Hitters)[2] -1
+regfit.full<-regsubsets(Salary~., data=Hitters, nvmax=p_features)
+reg.summary<-summary(regfit.full)
+reg.summary
+names(reg.summary)
+```
+Asteriks show the best selected features for a given `k`.
+
+Lets explore $R^2$. Then plot RSS, adusted $R^2$, $C_p$ and $BIC$.
+```{r}
+reg.summary$rsq
+
+par(mfrow=c(1,2))
+plot(reg.summary$rss ,xlab="Number of Variables ",ylab="RSS",
+type="l", main="Best subset select")
+plot(reg.summary$adjr2 ,xlab="Number of Variables ",
+ylab="Adjusted RSq",type="l", main="Best subset select")
+
+idx_max<- which.max(reg.summary$adjr2)
+paste("R-squared is at max with  number of features:",idx_max)
+points(idx_max,reg.summary$adjr2[idx_max],col="red", cex=2, pch=20)
+```
+
+In similar fashion lets plot $C_p$ and $BIC$ statitstics.
+```{r}
+par(mfrow=c(1,2))
+plot(reg.summary$cp, xlab="Number of Variables", ylab="Cp",type="l", main="subset select")
+cp_idx <- which.min(reg.summary$cp)
+points(cp_idx,reg.summary$cp[cp_idx],col="red", cex=2, pch=20)
+
+plot(reg.summary$bic, xlab="Number of Variables", ylab="BIC",type="l", main="subset select")
+b_idx <- which.min(reg.summary$bic)
+points(b_idx,reg.summary$bic[b_idx],col="red", cex=2, pch=20)
+
+```
+
+The `regsubsets()` has a built-in `plot()`.
+```{r}
+plot(regfit.full,scale="r2")
+plot(regfit.full,scale="adjr2")
+plot(regfit.full,scale="Cp")
+plot(regfit.full,scale="bic")
+```
+
+Smallest BIC is for a model with 6 predictors. Print their coeffs
+```{r}
+coef(regfit.full,6)
+```
+
+### Forward and Backward Stepwise selection
+
+`resubsets()` acn be also used to do forward and backwards stepwise selection
+
+```{r}
+p_features<- dim(Hitters)[2] -1
+regfit.fwd<-regsubsets(Salary~., data=Hitters, nvmax=p_features,method="forward")
+reg_f.summary<-summary(regfit.fwd)
+reg_f.summary
+regfit.bwd<-regsubsets(Salary~., data=Hitters, nvmax=p_features,method="backward")
+reg_b.summary<-summary(regfit.bwd)
+reg_b.summary
+```
+For the model with 7 predictors the coeffs are different by the best subset, forward-step and backward step selections
+```{r}
+coef(regfit.full,7)
+coef(regfit.fwd,7)
+coef(regfit.bwd,7)
+```
+
+## Choosing Among Models using Validation Set approach and Cross-Validation
+
+We will be fitting all models using only observations from **training dataset**.
+### Validation Set Approach
+We first divide the dataset into a training set and a test set. A training set is determined by an index vector or boolean values. **TRUE** means an observation is in a training set, **FALSE** is a test set
+
+```{r}
+set.seed(1) #for repoducibility of results
+#split the dataset roguhly in half
+train <- sample( c(TRUE,FALSE), nrow(Hitters), rep=TRUE)
+length(train)
+sum(train)  # how main elmements in train
+
+#test is the opposite of train
+test <- !train
+sum(test) #how many elements in test
+```
+Aplying `regsubsets()` for best subset selection only `train` dataset.
+```{r}
+regfit.best=regsubsets(Salary~.,data=Hitters[train,], nvmax =p_features)
+```
+
+Now lets compute explicitly the validation test error
+```{r}
+test.mat<-model.matrix(Salary~. ,data=Hitters[test,])
+dim(test.mat)
+
+val.errors <- rep(NA,p_features)
+#loop over models of all sizes between 1 and 19
+for (i in 1:p_features){
+	coefi <- coef(regfit.best,id=i) #best model of size k=i
+    pred  <- test.mat[,names(coefi)]%*%coefi #matrix vector multiplication
+    val.errors[i] <- mean( (Hitters$Salary[test]-pred)^2 )
+}
+val.errors
+```
+Lets plot the validation test error curve and the coefficients of the best model:
+```{r}
+plot(val.errors, ylab="test error", xlab="number of parametrs", type="l")
+ve_min <- which.min(val.errors)
+points(ve_min,val.errors[ve_min],col="red", cex=2, pch=20)
+ve_min
+coef(regfit.best,id=ve_min)
+```
+Lets write a function for `predict.regsubsets` 
+```{r}
+#syntax is complex
+predict.regsubsets<-function(object,newdata,id,...){
+    form<-as.formula(object$call[[2]])
+    mat<-model.matrix(form,newdata)
+    coefi<-coef(object,id=id)
+    mat[,names(coefi)]%*%coefi
+}
+```
+Lets use it in the k-fold validation . 
+```{r}
+k<-10
+set.seed(1)
+folds<-sample(1:k, nrow(Hitters), replace=TRUE)
+table(folds) # to see the frequency of echh element of a sequence 1:10
+#prepare a matrix to store  cross validation errors
+cv.errors <- matrix(NA,k,p_features, dimnames=list(NULL,paste(1:19)))
+
+#looping on  k folds
+for(j in 1:k ){
+  #method best model selection (cpu consuming)
+	best.fit <- regsubsets(Salary~.,data=Hitters[folds!=j,] ,nvmax=p_features)
+	   #loop through possible model sizes on test data
+   	for(i in 1:19){
+   		pred<-predict.regsubsets(best.fit, Hitters[folds==j,], id=i)
+   		cv.errors[j,i]<-mean( (Hitters$Salary[folds==j]-pred)^2)
+   }	
+}
+#obtain a mean cv error
+mean.cv.errors <- apply(cv.errors, 2, mean) #apply func mean on index 2 (columns)
+str(mean.cv.errors)
+print(paste("mean cv error:", paste(mean.cv.errors, collapse=",")))
+```
+Lets make a plot of cv curve and determinte the minumum  CVE.
+
+```{r}
+plot(mean.cv.errors, type='b', main="cross-validation curve for best subset selection", xlab="Number of Variables")
+min_cve_idx <- which.min(as.numeric(mean.cv.errors))
+paste("min CVE found for model size", min_cve_idx)
+points(min_cve_idx, mean.cv.errors[min_cve_idx],col="red", cex=2, pch=20)
+```
+
+## Lab 2: Ridge Regression and Lasso
+`glmnet` package will be used fro Ridge and Lasso.   `model.matrix` will be used to transfor model in a matrix form. This function also transforms any qualitataive variables into dummy variables 
+```{r}
+x <- model.matrix(Salary~. ,data=Hitters)[,-1] #syntax different in lecture
+y <- Hitters$Salary 
+```
+
+### Ridge Regresssion
+```{r}
+library(glmnet)
+grid <- 10^seq(10,-2,length=100) # array of 100 values from 10^10 to 10^-2 for lambda
+# by default glmnet standardize variables
+ridge.mod <- glmnet(x,y, alpha=0, lambda=grid) # alpha = 0  is ridge
+plot(ridge.mod)
+ridge.mod$lambda[50] #lambda from the middle of the grid
+coef(ridge.mod)[,50] #model coefficients for lambda from the middle of the grid
+dim(coef(ridge.mod))
+```
+We can also get coefficients using `predict`  e.g. for $\lambda=50$
+```{r}
+predict(ridge.mod, s=11497.57,type="coefficients")[1:20,]
+```
+
+We now split data into a training set and a test set
+
+```{r}
+set.seed(1)
+#split in half
+full_idx <- 1:nrow(x)
+train <- sample(full_idx, length(full_idx)/2 )
+test <- full_idx[-train] 
+y.test <- y[test]
+#observe train and test set (indexes)
+sort(train)
+sort(test)
+```
+Then we fit a ridge on the training set and evaluate its MSE on the test set using $\lambda = 4$
+
+```{r}
+#fit ridge on train
+ridge.mod <- glmnet(x[train,], y[train], alpha=0, lambda = grid, thresh=1e-12 ) #alpha=0 is ridge
+ridge.pred <- predict(ridge.mod, s=4, newx=x[test,]) #make predictions for lambda = 4
+mse_lambda_4 <- mean((ridge.pred-y.test)^2) #mse on test for lambda = 4
+mse_lambda_4
+```
+Lets compapre this MSE of $\lambda=4$ to cases with null model (only intercept) and to MSE of $\lambda=0$
+
+```{r}
+#compute mse of the null model (only intercept as param)
+mse_nullmodel <- mean( (mean(y[train])-y.test)^2 )
+#predict for lambda = 10^10
+ridge.pred <- predict(ridge.mod, s=1e10, newx=x[test,])
+mse_lambda_inf <- mean((ridge.pred-y.test)^2)
+
+#predict mse  for lambda = 0
+ridge.pred <- predict(ridge.mod, s=0, newx=x[test,])
+mse_lambda_zero <- mean((ridge.pred-y.test)^2)
+
+#lets compare mses
+paste("mse of null model:",mse_nullmodel
+      ,"mse of lambda very large:",mse_lambda_inf
+      ,"mse of lambda 0:", mse_lambda_zero
+      ,"mse of lambda 4:",mse_lambda_4)
+```
+We observe that the case of lambda 4 has a much lower MSE compared to full collapse of parameters ($\lambda -> \infty$) and no collapse of parameters ($\lambda =0$).
+
+Lets verify that coefficients of ridge with $\lambda=0$ correspond to a classical linear  regression. It is still advised to use `lm()` for linear regression as this function generates also p-values.
+
+```{r}
+lm.reg<-lm(y~x, subset=train)
+print(lm.reg)
+#note exact=TRUE param
+print(predict(ridge.mod, s=0, exact=TRUE, type="coefficients")[1:20,] )
+```
+
+Now lets find a minimal test MSE using a cross validation using `cv.glmnet()`.
+```{r}
+set.seed(1)
+cv.out <- cv.glmnet(x[train,], y[train], alpha=0)
+bestlam<-cv.out$lambda.min
+bestlam
+plot(cv.out)
+#the test MSE for best lambda
+ridge.pred <- predict(ridge.mod, s=bestlam, newx=x[test,])
+bestlam_mse <- mean((ridge.pred-y.test)^2)
+bestlam_mse
+```
+If we print model coefficients with best determined lamba, we see that none of them is zero. Thus the ridge regularisation does not shrink the model.
+```{r}
+out=glmnet(x,y,alpha=0)
+coefs<-predict(out,type="coefficients",s=bestlam)[1:20,]
+coefs
+```
+### The Lasso Regression
+
+Same fuctions are uses as with Ridge except the paramere `alpha=1`
+```{r}
+lasso.mod=glmnet(x[train ,],y[train],alpha=1,lambda=grid)
+plot(lasso.mod)
+```
+Lets compute the best lambda and MSE usng the cross validation as for the Ridge. 
+```{r}
+set.seed (1)
+cv.out <- cv.glmnet(x[train,], y[train],alpha=1)
+plot(cv.out)
+bestlam=cv.out$lambda.min
+print(bestlam)
+lasso.pred=predict(lasso.mod,s=bestlam ,newx=x[test,])
+mse_bestlam_lasso <- mean((lasso.pred-y.test)^2)
+print(mse_bestlam_lasso)
+```
+We see that the best Lasso MSE is very similar as best Ridge MSE.
+
+Now lets see how lasso shrinks the model,
+
+```{r}
+out <- glmnet(x,y, alpha=1, lambda=grid)
+lasso.coef <- predict(out, type="coefficients", s=bestlam)[1:20,]
+print(lasso.coef)
+print(lasso.coef[lasso.coef != 0])
+```
+We observe that for the best $\lambda$ the model has only 7 variables (out of 19).
+
+##Lab 3: PCR and PLS Regression
+#### PCR: Principal Components Regression
+Package `pls` is used forPCR and PLS Rgressions.
+Lets make the pcr fit on all daa and observe it summary
+```{r}
+library(pls)
+set.seed(2)
+pcr.fit=pcr(Salary~., data=Hitters ,scale=TRUE,validation ="CV")
+print(summary(pcr.fit))
+```
+Observe that `pcr()` reports the root mean squared error; in order to obtain the usual MSE, we must square this quantity. 
+
+In the variance exmplined section the  `X` is the amount of information about the model predictors captured by  components. `Salary` shows the variance explained for the model response variable.
+
+We can plot the cross-validation scores.
+```{r}
+validationplot(pcr.fit, val.type="MSEP") #MSEP - cross-validation MSE to be plotted
+```
+
+Now we perform pcr on the training data and evaluate its test MSE.
+```{r}
+set.seed(1)
+pcr.fit=pcr(Salary~., data=Hitters,subset=train,scale=TRUE,validation ="CV")
+validationplot(pcr.fit,val.type="MSEP")
+```
+
+We observe from the plot the min of CV error is when the number of componenets  equals 7.
+Lets find the correspoinding test MSE.
+```{r}
+pcr.pred <- predict(pcr.fit, x[test,], ncomp=7) 
+mse_test_min <- mean((pcr.pred-y.test)^2)
+mse_test_min
+```
+
+We fit PCR on the full data set, using M = 7, the number of components identified by cross-validation.
+```{r}
+pcr.fit <- pcr(y~x, scale=TRUE, ncomp=7) #on all dataset on 7 componentts
+print(summary(pcr.fit))
+```
+
+#### PLS: Partial Least Squares Regression
+Partial least squares is available in the same `pls` package and uses the same syntax.
+```{r}
+set.seed (1)
+pls.fit=plsr(Salary~., data=Hitters, subset=train, scale=TRUE, validation="CV")
+print(summary(pls.fit))
+validationplot(pls.fit,val.type="MSEP")
+```
+
+We see that minimum of MSE happens for number of components M=2.
+Lets compute the corresponding test MSE. 
+```{r}
+pls.pred <- predict(pls.fit, x[test,], ncomp=2) 
+mse_test_min <- mean((pls.pred-y.test)^2)
+print(mse_test_min)
+```
+This test MSE is comparable but slightly higher that, the test MSE of ridge, lasso and PCR.
+Lets do a pls fit on the whole data using a found number of components M=2
+```{r}
+pls.fit <- plsr(Salary~., data=Hitters, scale=TRUE, ncomp=2)
+print(summary(pls.fit))
+```
+In PLS with 2 components almost the same amount of variance is exaplained was with 7 components of PCR.

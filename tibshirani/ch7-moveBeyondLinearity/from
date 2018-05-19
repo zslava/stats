@@ -1,0 +1,106 @@
+from
+https://web.archive.org/web/20170307224949/https://googleyasheck.com/what-you-need-to-know-for-your-google-interview-and-what-you-dont/
+
+
+what you need to know for cs intview prep
+=========================================
+
+
+
+complexity/space analysis
+bitwise operations
+linked lists
+stacks
+queues/deques
+arrays/vectors
+hash tables (maps)
+sets
+binary search
+sorting
+selection
+insertion
+heapsort
+quicksort
+merge sort
+priority queues
+binary heap
+trees
+binary search trees
+balanced search trees (general concept)
+traversals: preorder, inorder, postorder, BFS, DFS
+graphs
+directed
+undirected
+adjacency matrix
+adjacency list
+dynamic programming (note: does not appear in coaching notes, but is useful)
+probability
+permutations and combinations
+object-oriented programming
+processes/threading
+memory
+caching
+deadlock avoidance
+scheduling
+testing practices (1+ year experience)
+If you have a networking background, expect to be asked:
+
+network stack / OSI
+If you have 4 or more years of experience, expect system designs in addition to coding problems.
+
+scaling large systems
+designing for scale
+
+
+What you don't need to know
+===========================
+
+Even though you don't need these, my contact mentioned: "It is expected that a candidate can understand and apply any of those concepts if they are explained, however."
+
+Dijkstra - single-source shortest paths
+Bellman-Ford - single-source shortest paths, allowing negative weight edges
+Floyd-Warshall - all-pairs shortest paths
+Ford-Fulkerson - maximum flow
+Minimum spanning tree
+Prim-Jarnik
+Kruskal
+geometric algorithms
+convex hull
+positional/overlap/horizons
+union-find / disjoint sets
+backtracking
+pattern/substring matching
+Rabin-Karp
+Boyer-Moore (Horspool)
+Knuth-Morris-Pratt
+suffix trees
+suffix arrays
+tries
+Selection (k smallest items, etc)
+Other types of graph representation:
+adjacency map
+edge list
+Linear-time sorts:
+radix sort
+bucket sort
+counting sort
+Other types of trees:
+(a,b) trees, k-ary trees (example: (2,4)-trees)
+B-trees
+k-D trees
+balanced search trees (details such as rotations)
+red-black trees
+AVL
+splay trees
+data compression, information theory
+linear programming
+garbage collection
+cryptography
+skip lists
+van Emde Boas trees
+treap
+multisets
+multimaps
+fast Fourier transform
+Bloom filter
+

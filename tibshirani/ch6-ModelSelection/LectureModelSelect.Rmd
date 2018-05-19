@@ -1,0 +1,189 @@
+---
+title: "ISLR Chapter 6. Lecture ModelSelect"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Model Selection
+===================
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown 
+
+Hitters is a dataset with baseball statisitcs.
+
+
+```{r hitteres}
+library(ISLR)
+dim(Hitters)
+summary(Hitters)
+```
+
+Checking if dta has  missing values. If yes get rid of NAs.
+```{r omit}
+dim(Hitters)
+with(Hitters,sum(is.na(Salary)))  # we have some missing values
+Hitters <- na.omit(Hitters)  #remove rows with NA data
+with(Hitters,sum(is.na(Salary)))  # check after na removal
+dim(Hitters)
+```
+
+
+Best Subset regression
+----------------------
+
+We will use the package `leaps`  to evaluation all the best-subset models
+
+```{r bsubs}
+library(leaps)
+regfit.full<-regsubsets(Salary~.,data=Hitters)
+summary(regfit.full)
+```
+It gives the default beset-subset up to size 8 : lets increase that to 19 i.e. al the variables 
+```{r bsubsb}
+regfit.full<-regsubsets(Salary~.,data=Hitters,nvmax=19)
+reg.summary<-summary(regfit.full)
+names(reg.summary)
+plot(reg.summary$cp,xlab="Number of Variables", ylab="Cp",main="Cp statistics vs model complexity")
+## lets colorcode the curve minimum point
+minimum_point_idx<-which.min(reg.summary$cp) # 10
+points(minimum_point_idx,reg.summary$cp[minimum_point_idx],pch=20,col="red")
+```
+There exist a plot method for `regsubsets` object
+```{r rsubs plot}
+plot(regfit.full,scale="Cp")
+coef(regfit.full,10) #coefficients for model indexed 10
+```
+
+
+Forward Stepwise Selection
+--------------------------
+
+Here we use `regsubsets` function but specify the `method="forward"` option:
+```{r}
+regfit.fwd <- regsubsets(Salary~. ,data=Hitters, nvmax=19,method="forward")
+summary(regfit.fwd)
+plot(regfit.fwd,scale="Cp")
+```
+
+Model Selection using a Validation Set
+--------------------------------------
+
+Lets make a training and a vlidation set, so that we can choose a good subset model. 
+We will do it using a slightly different approach from what was done in the book.
+```{r}
+dim(Hitters)
+set.seed(1)
+nrows <- dim(Hitters)[1] #263
+sample_size <- floor(2/3 * nrows) + 5  # training sample of size 180
+train<-sample(seq(nrows),sample_size,replace=FALSE)
+regfit.fwd <- regsubsets(Salary~. ,data=Hitters[train,]
+                        ,nvmax=19,method="forward")
+```
+Now we will make predictions on the observatons not used for training.
+We know there are 19 models, so we set up some vectors to record the errors. We hae to do a bit of work here, because there is no predict method for `regsubsets`.
+```{r}
+val.errors<-rep(NA,19) # 19 is thte max numb of predictors in the Hitters dataset
+x.test <- model.matrix(Salary~. , data=Hitters[-train,]) #-train is index for test
+for(i in 1:19){
+   coefi <- coef(regfit.fwd,id=i)
+   pred  <- x.test[,names(coefi)]%*%coefi #varieables * model coefficients
+   val.errors[i] <- mean((Hitters$Salary[-train]-pred)^2)
+}
+plot(sqrt(val.errors), ylab="Root MSE", ylim=c(300,400), pch=19,type="b")
+points(sqrt(regfit.fwd$rss[-1]/sample_size), col="blue", pch=19,type="b")
+legend("topright", legend=c("Training", "Validation"), col=c("blue","black"), pch=19)
+```
+
+As we expect, the training error goes down monotonically as the model gets bigger, but not so for the valiation error. 
+
+Lets put the above code in the function 
+```{r}
+predict.regsubsets<-function(object,newdata,id,...){
+	form<-as.formula(object$call[[2]])
+	mat<-model.matrix(form,newdata)
+	coefi<-coef(object,id=id)
+	mat[,names(coefi)]%*%coefi
+}
+```
+
+Model Selecton by Cross Validation
+------------------
+We weill do 10-fold cross-validation. It is easy!
+
+```{r}
+set.seed(11)
+#index for sample
+folds <- sample(rep(1:10, length=nrow(Hitters)))
+print("folds: counts of elemnts")
+print(table(folds))
+```
+We observe that every digit between 1 and 10 is equally represented.
+```{r}
+cv.errors<-matrix(NA,10,19)  #matrix 10 rows 19 columns
+## loop on k folds
+for (k in 1:10){
+	best.fit<-regsubsets(Salary~. ,data=Hitters[folds!=k,]
+						,nvmax=19 ,method="forward")
+
+	
+	## loop on p predictors
+	for (i in 1:19){
+	  ##use the function predict.regsubsets previously defined
+		pred<-predict.regsubsets(best.fit,Hitters[folds==k,],id=i)
+		cv.errors[k,i] <- mean( (Hitters$Salary[folds==k] - pred)^2)
+	}
+ 
+}
+#print(cv.errors)
+rmse.cv<-sqrt(apply(cv.errors, 2,mean))
+plot(rmse.cv, pch=19,type="b", main="cross-validaton curve")
+```
+
+We observe tha the model  with lowest `RMSE`  are those of 11 predictors.
+
+
+Ridge Regression and the Lasso
+-------------------------------
+
+```{r}
+library(glmnet)
+x<-model.matrix(Salary~.-1,data=Hitters)
+y<-Hitters$Salary
+```
+
+First fwe fit a ridge-regression model. This is achieved by calling 'glmnet` with `alpha=0` (see the helpfile). there is also a `cv.glmnet` function which will do the cross-validation for us.
+
+```{r}
+fit.ridge<-glmnet(x,y,alpha=0)
+plot(fit.ridge,xvar="lambda",label=TRUE)
+cv.ridge<-cv.glmnet(x,y,alpha=0)
+plot(cv.ridge)
+```
+
+Now we fit a  lasso model; for this we use the default `alpha=1`
+```{r}
+fit.lasso<-glmnet(x,y)
+plot(fit.lasso,xvar="lambda", label=TRUE)
+plot(fit.lasso,xvar="dev", label=TRUE)
+cv.lasso <- cv.glmnet(x,y)
+plot(cv.lasso)
+print(coef(cv.lasso))
+```
+Suppose we want to use our ealier  train/validation divistion to select the lambda for the lasso.
+```{r}
+lasso.tr<- glmnet(x[train,],y[train])
+print(lasso.tr)
+pred<-predict(lasso.tr,x[-train,])
+print(dim(pred))
+rmse <- sqrt(apply((y[-train]-pred)^2,2,mean ))
+
+plot(log(lasso.tr$lambda),rmse,type="b",xlab="Log(lambda)")
+lam.best <- lasso.tr$lambda[order(rmse)[1]]
+print(lam.best)
+print(coef(lasso.tr,s=lam.best))
+```
