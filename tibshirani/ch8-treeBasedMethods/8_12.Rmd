@@ -1,0 +1,82 @@
+---
+title: "8_12"
+author: "S Zimine"
+date: "7/11/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+set.seed(1)
+require(ISLR)
+data(Smarket)
+summary(Smarket)
+set.seed(1)
+```
+
+```{r}
+nsamp <- dim(Smarket)[1]
+train <- sample(1:nsamp, 2/3*nsamp)
+test <- (1:nsamp)[-train]
+```
+
+## logistic regression
+
+```{r}
+glm.fit <- glm(Direction ~ . - Year - Today, data=Smarket[train,], family="binomial")
+glm.prob <- predict(glm.fit, newdata=Smarket[test,], type="response")
+glm.pred <- ifelse(glm.prob > 0.5, "Up", "Down")
+cm <- table(glm.pred, Smarket[test,]$Direction)
+print(cm)
+
+#test error
+logi.test.err <- mean(glm.pred != Smarket[test,]$Direction)
+logi.test.err
+```
+
+##boosting
+```{r}
+library(gbm)
+Smarket$BinomialDirection <- ifelse(Smarket$Direction == "Up", 1,0)
+
+boost.fit <- gbm(BinomialDirection ~ . - Year - Today - Direction,data=Smarket[train,],
+                 distribution="bernoulli", n.trees = 5000)
+yhat.boost <- predict(boost.fit, newdata=Smarket[test,], n.trees=5000)
+yhat.pred <- rep(0, length(yhat.boost))
+yhat.pred[yhat.boost > 0.5] = 1
+
+cm <- table(yhat.pred, Smarket[test,]$BinomialDirection)
+print(cm)
+#test error
+boost.test.err <- mean(yhat.pred != Smarket[test,]$BinomialDirection)
+boost.test.err
+
+```
+
+### bagging
+```{r}
+Smarket = Smarket[, !(names(Smarket) %in% c("BinomialDirection"))]
+library(randomForest)
+
+bag.fit <- randomForest(Direction ~ . - Year - Today, data=Smarket[train,], mtry=6 )
+yhat.bag <- predict(bag.fit, newdata=Smarket[test,])
+cm <- table(yhat.bag, Smarket[test,]$Direction)
+print(cm)
+bag.test.err <- mean(yhat.bag != Smarket[test,]$Direction)
+print(bag.test.err)
+```
+
+#### random forest
+
+```{r}
+rf.fit <- randomForest(Direction ~ . - Year - Today, data=Smarket[train,], mtry=2)
+yhat.rf <- predict(rf.fit, newdata=Smarket[test,])
+cm <- table(yhat.rf, Smarket[test,]$Direction)
+print(cm)
+rf.test.err <- mean(yhat.rf != Smarket[test,]$Direction)
+print(rf.test.err)
+```
+We observet that bagging and random forest  has the lowest test error rate 

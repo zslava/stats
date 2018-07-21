@@ -279,9 +279,7 @@ anova(gam.m1,gam.m2,gam.m3,test="F")
 
 }
 
-  
-
-
+ 
 
 ###### main  ######
 #prhead(label="ch7 lecture")

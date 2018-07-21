@@ -1,0 +1,55 @@
+---
+title: "ch10 ex 9"
+output: html_document
+---
+
+
+```{r}
+data(USArrests)
+x<- USArrests
+str(x)
+states <- row.names(USArrests)
+```
+
+### a
+
+
+```{r}
+hc_c <- hclust(dist(x), method="complete")
+plot(hc_c)
+```
+
+### b
+```{r}
+ct <- cutree(hc_c, 3)
+
+print( states[which(ct==1)] )
+print( states[which(ct==2)] )
+print( states[which(ct==3)] )
+
+print( table(ct) )
+```
+
+### c
+
+```{r}
+xs <- scale(x)
+hc_sc <- hclust(dist(xs), method="complete")
+```
+
+
+### d
+```{r}
+plot(hc_sc)
+```
+
+We now have rather 4 significant clusters.  So clusters are affected 
+
+```{r}
+ctt <- cutree(hc_sc, 3)
+table(ctt)
+
+table(unscaled=ct, scaled=ctt)
+```
+
+Scaling of this data should be applied as a first step  as the dataset features are of different nature  e.g.  UrbanPop vs Murder, Assault, Rape rates.

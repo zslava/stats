@@ -1,0 +1,464 @@
+---
+title: "ch8 applied"
+author: "S Zimine"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Ex 7
+=====
+
+```{r}
+require(MASS)
+require(randomForest)
+data(Boston)
+nfeats <- dim(Boston)[2] -1 #total number of features in the dataset
+nsamp <-  dim(Boston)[1]
+
+mtrys <- c(nfeats, nfeats/2, sqrt(nfeats))
+ntrees <- seq(from=1, to=500)
+```
+
+We define features train  and test sets and  train and test response vectors
+
+```{r}
+set.seed(1101)
+#split into train and test
+#train <- sample( 1:nsamp, floor(4/5 * nsamp) )
+train <- sample( 1:nsamp, nsamp/2 )
+test <- (1:nsamp)[-train]
+
+X.train <- Boston[train, -14] # all features minus response
+X.test <-  Boston[test, -14]
+
+Y.train <- Boston[train, 14] #response vector
+Y.test  <- Boston[test, 14]
+
+```
+
+```{r}
+p <- nfeats
+p.2 <- p / 2
+p.sq <- sqrt(p)
+
+#fit models for each  p (rf.boston.p$mse will contain values for each tree between 1 and 500)
+rf.boston.p <- randomForest(X.train, Y.train, xtest=X.test, ytest=Y.test, mtry=p, ntree=500) 
+rf.boston.p2 <- randomForest(X.train, Y.train, xtest=X.test, ytest=Y.test, mtry=p.2, ntree=500) 
+rf.boston.psq <- randomForest(X.train, Y.train, xtest=X.test, ytest=Y.test, mtry=p.sq, ntree=500) 
+
+# and plot the tes tmse data
+# find ylims
+y_min <- 0.9* min(c(rf.boston.p$test$mse, rf.boston.p2$test$mse, rf.boston.psq$test$mse))
+y_max <- 1.1* max(c(rf.boston.p$test$mse, rf.boston.p2$test$mse, rf.boston.psq$test$mse))
+
+plot(1:500, rf.boston.p$test$mse, col="green", type="l", xlab="# trees", ylab="test mse", ylim=c(y_min,y_max))
+lines(1:500, rf.boston.p2$test$mse, col="red", type="l")
+lines(1:500, rf.boston.psq$test$mse, col="blue", type="l")
+legend("topright", c("m=p", "m=p/2", "m=sqrt(p)"), col=c("green", "red", "blue"), cex=1, lty=1)
+
+```
+
+We observe that `m=sqrt(p)` yields slightly better results compard to `m=p/2`
+
+If we use another split between train and test , we can different test mse values . For instance for 4/5, 1/5 split the test mse would be around 6.
+
+
+Ex 8
+=====
+```{r}
+require(ISLR)
+require(tree)
+data(Carseats)
+```
+
+### a)
+```{r}
+set.seed(1011)
+nfeats <- dim(Carseats)[2] -1
+nsamp <-  dim(Carseats)[1]
+train <- sample( 1:nsamp, size=250) #250 / 150 split
+test <- (1:nsamp)[-train]
+```
+
+### b)
+```{r}
+tree.carseats <- tree(Sales~., data=Carseats[train,])
+plot(tree.carseats)
+text(tree.carseats,pretty=0)
+tree.pred <- predict(tree.carseats, Carseats[test,])
+test.mse <- mean( (Carseats[test,]$Sales - tree.pred)^2 )
+print(paste("full tree test mse", test.mse))
+
+```
+
+### c
+```{r}
+cv.carseats <- cv.tree(tree.carseats, FUN=prune.tree)
+plot(cv.carseats$size, cv.carseats$dev, type="b") #best value at 16
+prune.carseats <- prune.tree(tree.carseats, best=16)
+plot(prune.carseats)
+text(prune.carseats,pretty=0)
+
+tree.pred <- predict(prune.carseats, Carseats[test,])
+test.mse <- mean( (Carseats[test,]$Sales - tree.pred)^2 )
+print(paste("pruned tree test mse", test.mse))
+```
+
+Prunning did a tiny improvement of the test mse
+
+
+#### d)
+
+```{r}
+require(randomForest)
+bag.carseats <- randomForest(Sales~.,data=Carseats[train,], mtry=nfeats, tree=500, importance=T) #m=p is a bagging case of RandomForest
+bag.pred <- predict(bag.carseats, Carseats[test,])
+test.mse <- mean( (Carseats[test,]$Sales - bag.pred)^2 )
+print(paste("bagging test mse", test.mse))
+
+print( importance(bag.carseats))
+
+```
+
+Bagging reduces significantly the test mse.
+
+The most significat featatures to predict $\tt{Sales}$  are: $\tt{Price}$, $\tt{ShelveLoc}$, $\tt{Age}$.
+
+
+#### e)
+```{r}
+rf.carseats = randomForest(Sales~., data=Carseats[train,], mtry=5, ntree=500, importance=T)
+rf.pred = predict(rf.carseats, Carseats[test,])
+test.mse  = mean((Carseats[test,]$Sales - rf.pred)^2)
+print( importance(rf.carseats) )
+print(paste("random forest test mse", test.mse))
+```
+
+In this data set RF slightly increased the test mse
+
+Ex 9
+=====
+
+
+### a
+```{r}
+set.seed(1013)
+nfeats <- dim(OJ)[2] -1
+nsamp <-  dim(OJ)[1]
+train <- sample( 1:nsamp, size=800) #250 / 150 split
+test <- (1:nsamp)[-train]
+```
+
+#### b
+```{r}
+tree.oj <- tree(Purchase~., data=OJ[train,] )
+summary(tree.oj)
+```
+
+Variables actually used in the tree constructions are: "LoyalCH"   "PriceDiff"
+Training error reported (misclassification error ate) = 0.11
+
+
+#### c
+```{r}
+print(tree.oj)
+```
+
+Let's pick terminal node labeled "10)". The splitting variable at this node is $\tt{PriceDiff}$. The splitting value of this node is $0.05$. There are $79$ points in the subtree below this node. The deviance for all points contained in region below this node is $76.79$. * in the line denotes that this is in fact a terminal node. The prediction at this node is $\tt{Sales}$ = $\tt{MM}$. About $19$% points in this node have $\tt{CH}$ as value of $\tt{Sales}$. Remaining $81$% points have $\tt{MM}$ as value of $\tt{Sales}$.
+
+##### d
+```{r}
+plot(tree.oj)
+text(tree.oj,pretty=0)
+```
+
+`LoyalCH` is the most imporant variable of the tree. Top 3 nodes contain `LoyalCH`
+
+#### e
+
+```{r}
+oj.pred <- predict(tree.oj, OJ[test,],type="class") #classification
+cm <- table(OJ[test,]$Purchase, oj.pred)
+print(cm)
+accuracy <- sum(diag(cm))/sum(cm)
+errorrate <- 1 - accuracy
+errorrate
+```
+
+#### f  g
+```{r}
+cv.oj <- cv.tree(tree.oj, FUN=prune.tree)
+print(cv.oj)
+#str(cv.oj)
+plot(cv.oj$size, cv.oj$dev, type ="b", xlab = "tree size", ylab="deviance")
+```
+
+### h 
+
+Cross validation indicates that tree size = 6 has the lowest deviance
+
+
+###  i
+```{r}
+prune.oj <- prune.tree(tree.oj,best=6)
+#plot(prune.oj)
+```
+
+### j
+```{r}
+summary(tree.oj)
+summary(prune.oj)
+```
+misclassification error is exactly the same between original and pruned tree
+
+
+### k
+```{r}
+prune.oj.pred <- predict(prune.oj, OJ[test,],type="class") #classification
+cmp <- table(OJ[test,]$Purchase, prune.oj.pred)
+accuracy <- sum(diag(cmp))/sum(cmp)
+errorrate <- 1 - accuracy
+#for pruned
+errorrate
+```
+
+Test error rate  are also the same between original and unpruned trees  at 0.189
+
+
+Ex 10
+======
+
+```{r}
+require(ISLR)
+require(gbm)
+data(Hiters)
+```
+
+#### a
+
+```{r}
+##clean data
+sum(is.na(Hitters))
+Hitters <- na.omit(Hitters) ## removing NAs
+sum(is.na(Hitters))
+
+```
+
+### b
+
+```{r}
+
+nfeats <- dim(Hitters)[2] -1
+nsamp <-  dim(Hitters)[1]
+train <- 1:200 #250 / 150 split
+test <- (1:nsamp)[-train]
+```
+
+### c
+
+
+```{r}
+set.seed(103)
+pows = seq(-10, -0.2, by = 0.1)
+lambdas = 10^pows
+length.lambdas = length(lambdas)
+train.errors = rep(NA, length.lambdas)
+test.errors = rep(NA, length.lambdas)
+for (i in 1:length.lambdas) {
+  boost.hitters <- gbm(Salary ~ ., data=Hitters[train,] , distribution="gaussian",
+                       n.trees=1000, shrinkage = lambdas[i], interaction.depth = 1)
+  train.pred <- predict(boost.hitters, Hitters[train,], n.trees=1000 )
+  test.pred <- predict(boost.hitters, Hitters[test,], n.trees=1000 )
+  train.errors[i] <- mean( (Hitters[train,]$Salary - train.pred)^2  )
+  test.errors[i] <- mean( (Hitters[test,]$Salary - test.pred)^2  )
+}
+#plotting
+plot(lambdas, train.errors, type="b", xlab="shrinkage (lambda)", ylab = "train MSE", col="blue", pch=20)
+```
+
+### d 
+```{r}
+plot(lambdas, test.errors, type="b", xlab="shrinkage (lambda)", ylab = "test MSE", col="red", pch=20)
+print(paste("boosting best test mse ", min(test.errors)))
+best_lambda <- lambdas[which.min(test.errors)]
+best_lambda
+```
+
+#### e 
+```{r}
+## linear regression full model
+lm.fit <- lm(Salary ~ ., data=Hitters[train,])
+lm.pred <- predict(lm.fit, Hitters[test,])
+lm.test.mse <- mean( (Hitters[test,]$Salary  - lm.pred)^2   )
+print(paste("OLS test mse full model", lm.test.mse))
+
+### lasso
+library(glmnet)
+set.seed(134)
+x <- model.matrix(Salary ~ . , data=Hitters[train,])
+y <- Hitters[train,]$Salary
+x.test <- model.matrix(Salary ~ . , data=Hitters[test,])
+lasso.fit <- glmnet(x,y, alpha=1) #lasso
+lasso.pred <- predict(lasso.fit, s=0.01, newx = x.test)
+lasso.test.mse <- mean( (Hitters[test,]$Salary - lasso.pred)^2)
+print(paste("lasso regularisation test mse", lasso.test.mse))
+```
+Linear regression and regularisation like lasso have higher test MSE then boosting almost by a factor of two
+
+### f
+
+```{r}
+boost.best <-  gbm(Salary ~ ., data=Hitters[train,] , distribution="gaussian",
+                       n.trees=1000, shrinkage = best_lambda, interaction.depth = 1)
+summary(boost.best)
+```
+
+`CHmRun`, `Walks` and `CatBat` are the three most important variables.
+
+
+### g
+```{r}
+require(randomForest)
+bag.hitters <- randomForest(Salary~., data=Hitters[train,], mtry=nfeats, tree=500, importance=T) #m=p is a bagging 
+bag.pred <- predict(bag.hitters, Hitters[test,])
+bag.test.mse <- mean( (Hitters[test,]$Salary - bag.pred)^2 )
+print(paste("bagging test mse", bag.test.mse))
+
+```
+Bagging test MSE is very similar to boosting test.mse
+
+
+Ex 11
+======
+
+```{r}
+require(ISLR)
+require(gbm)
+data(Caravan)
+```
+
+#### a)
+
+```{r}
+nfeats <- dim(Caravan)[2] -1 
+nsam  <- dim(Caravan)[1]
+train <- 1:1000
+test <- (1:nsam)[-train]
+Caravan$Purchase = ifelse(Caravan$Purchase == "Yes", 1, 0)
+```
+
+#### b)
+```{r}
+set.seed(342)
+boost.fit <- gbm(Purchase ~ ., data=Caravan[train,], distribution="bernoulli",
+                 n.trees=1000, shrinkage = 0.01)
+summary(boost.fit)
+```
+
+For boost the most significant variables are `PPERSAUT`, `PPLEZIER`, `PBRAND`
+#### c
+```{r}
+  boost.prob <- predict(boost.fit, Caravan[test,], n.trees=1000, type="response")
+  boost.pred <-ifelse(boost.prob > 0.2, 1, 0)
+  cm <- table(Caravan[test,]$Purchase, boost.pred)
+  print(cm)
+
+  ## proporton of predicted to purchase who actually purchased
+  f_pred_purch <- cm[2,2] / sum(cm[,2])  #all predicted to purchase is sum(cm[,2])
+  f_pred_purch
+```
+
+
+About 20% of people predicted to make a purchase actually end up making one.
+
+
+```{r}
+logi.fit <- glm(Purchase ~ . ,  data=Caravan[train,], family=binomial )
+logi.prob <- predict(logi.fit, Caravan[test,], type="response")
+logi.pred <- ifelse(logi.prob > 0.2, 1, 0)
+cm.logi <- table(Caravan[test,]$Purchase, logi.pred)
+f_pred_purch <- cm.logi[2,2] / sum(cm.logi[,2])
+f_pred_purch
+```
+
+Log regression has a lower prediction rate compared to boosting
+
+
+Ex 12
+======
+
+```{r}
+set.seed(1)
+require(ISLR)
+data(Smarket)
+summary(Smarket)
+set.seed(1)
+```
+
+```{r}
+nsamp <- dim(Smarket)[1]
+train <- sample(1:nsamp, 2/3*nsamp)
+test <- (1:nsamp)[-train]
+```
+
+## logistic regression
+
+```{r}
+glm.fit <- glm(Direction ~ . - Year - Today, data=Smarket[train,], family="binomial")
+glm.prob <- predict(glm.fit, newdata=Smarket[test,], type="response")
+glm.pred <- ifelse(glm.prob > 0.5, "Up", "Down")
+cm <- table(glm.pred, Smarket[test,]$Direction)
+print(cm)
+
+#test error
+logi.test.err <- mean(glm.pred != Smarket[test,]$Direction)
+logi.test.err
+```
+
+##boosting
+```{r}
+library(gbm)
+Smarket$BinomialDirection <- ifelse(Smarket$Direction == "Up", 1,0)
+
+boost.fit <- gbm(BinomialDirection ~ . - Year - Today - Direction,data=Smarket[train,],
+                 distribution="bernoulli", n.trees = 5000)
+yhat.boost <- predict(boost.fit, newdata=Smarket[test,], n.trees=5000)
+yhat.pred <- rep(0, length(yhat.boost))
+yhat.pred[yhat.boost > 0.5] = 1
+
+cm <- table(yhat.pred, Smarket[test,]$BinomialDirection)
+print(cm)
+#test error
+boost.test.err <- mean(yhat.pred != Smarket[test,]$BinomialDirection)
+boost.test.err
+
+```
+
+### bagging
+```{r}
+Smarket = Smarket[, !(names(Smarket) %in% c("BinomialDirection"))]
+library(randomForest)
+
+bag.fit <- randomForest(Direction ~ . - Year - Today, data=Smarket[train,], mtry=6 )
+yhat.bag <- predict(bag.fit, newdata=Smarket[test,])
+cm <- table(yhat.bag, Smarket[test,]$Direction)
+print(cm)
+bag.test.err <- mean(yhat.bag != Smarket[test,]$Direction)
+print(bag.test.err)
+```
+
+#### random forest
+
+```{r}
+rf.fit <- randomForest(Direction ~ . - Year - Today, data=Smarket[train,], mtry=2)
+yhat.rf <- predict(rf.fit, newdata=Smarket[test,])
+cm <- table(yhat.rf, Smarket[test,]$Direction)
+print(cm)
+rf.test.err <- mean(yhat.rf != Smarket[test,]$Direction)
+print(rf.test.err)
+```
+We observet that bagging and random forest  has the lowest test error rate 
+

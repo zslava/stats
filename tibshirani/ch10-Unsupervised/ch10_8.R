@@ -1,0 +1,29 @@
+##ch10 Applied
+
+
+# setwd("~/Dropbox/cs/bigdata/lagunita/tibshirani/ch10-Unsupervised/");source("ch10_8.R")
+
+require(ISLR)
+require(stats)
+data(USArrests)
+
+
+pr.out <- prcomp(USArrests, center=T, scale=T)
+loadings <- pr.out$rotation
+pve2 <- rep(NA,4)
+f_means <- apply(USArrests,MARGIN=2, mean)
+f_sdev <- sqrt(apply(USArrests,MARGIN=2, var))
+
+dsc <-  sweep(USArrests, MARGIN=2, f_means, FUN="-") #substracts from columns its means
+dsc <- sweep(dsc, MARGIN=2, f_sdev, FUN="/") # complete transform of feates (x -mu )/ sigma
+
+for (i in 1:4) { #for each of principal components 
+    proto_x <- sweep(dsc, MARGIN=2, loadings[,i], FUN="*") #multiply each column by is loading
+    pc_x <- apply(proto_x, MARGIN=1, sum) # sum up four loading components  1:nrow vector
+    pve2[i] <- sum(pc_x^2)
+    browser()
+}
+
+pve_alt <- pve2 / sum(dsc^2)  # sum(dsc^2) = total variance
+
+print(pve_alt)

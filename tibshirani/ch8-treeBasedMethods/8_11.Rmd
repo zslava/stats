@@ -1,0 +1,63 @@
+---
+title: "8_11"
+author: "S Zimine"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(ISLR)
+require(gbm)
+data(Caravan)
+```
+
+#### a)
+
+```{r}
+nfeats <- dim(Caravan)[2] -1 
+nsam  <- dim(Caravan)[1]
+train <- 1:1000
+test <- (1:nsam)[-train]
+Caravan$Purchase = ifelse(Caravan$Purchase == "Yes", 1, 0)
+```
+
+#### b)
+```{r}
+set.seed(342)
+boost.fit <- gbm(Purchase ~ ., data=Caravan[train,], distribution="bernoulli",
+                 n.trees=1000, shrinkage = 0.01)
+summary(boost.fit)
+```
+
+For boost the most significant variables are `PPERSAUT`, `PPLEZIER`, `PBRAND`
+#### c
+```{r}
+  boost.prob <- predict(boost.fit, Caravan[test,], n.trees=1000, type="response")
+  boost.pred <-ifelse(boost.prob > 0.2, 1, 0)
+  cm <- table(Caravan[test,]$Purchase, boost.pred)
+  print(cm)
+
+  ## proporton of predicted to purchase who actually purchased
+  f_pred_purch <- cm[2,2] / sum(cm[,2])  #all predicted to purchase is sum(cm[,2])
+  f_pred_purch
+```
+
+
+About 20% of people predicted to make a purchase actually end up making one.
+
+
+```{r}
+logi.fit <- glm(Purchase ~ . ,  data=Caravan[train,], family=binomial )
+logi.prob <- predict(logi.fit, Caravan[test,], type="response")
+logi.pred <- ifelse(logi.prob > 0.2, 1, 0)
+cm.logi <- table(Caravan[test,]$Purchase, logi.pred)
+f_pred_purch <- cm.logi[2,2] / sum(cm.logi[,2])
+f_pred_purch
+```
+
+Log regression has a lower prediction rate compared to boosting
+
+

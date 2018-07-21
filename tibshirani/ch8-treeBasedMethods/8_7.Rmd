@@ -1,0 +1,67 @@
+---
+title: "ch 8 ex 7"
+author: "S Zimine"
+date: "7/11/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Ex 7
+=====
+
+```{r}
+require(MASS)
+require(randomForest)
+data(Boston)
+nfeats <- dim(Boston)[2] -1 #total number of features in the dataset
+nsamp <-  dim(Boston)[1]
+
+mtrys <- c(nfeats, nfeats/2, sqrt(nfeats))
+ntrees <- seq(from=1, to=500)
+```
+
+We define features train  and test sets and  train and test response vectors
+
+```{r}
+set.seed(1101)
+#split into train and test
+#train <- sample( 1:nsamp, floor(4/5 * nsamp) )
+train <- sample( 1:nsamp, nsamp/2 )
+test <- (1:nsamp)[-train]
+
+X.train <- Boston[train, -14] # all features minus response
+X.test <-  Boston[test, -14]
+
+Y.train <- Boston[train, 14] #response vector
+Y.test  <- Boston[test, 14]
+
+```
+
+```{r}
+p <- nfeats
+p.2 <- p / 2
+p.sq <- sqrt(p)
+
+#fit models for each  p (rf.boston.p$mse will contain values for each tree between 1 and 500)
+rf.boston.p <- randomForest(X.train, Y.train, xtest=X.test, ytest=Y.test, mtry=p, ntree=500) 
+rf.boston.p2 <- randomForest(X.train, Y.train, xtest=X.test, ytest=Y.test, mtry=p.2, ntree=500) 
+rf.boston.psq <- randomForest(X.train, Y.train, xtest=X.test, ytest=Y.test, mtry=p.sq, ntree=500) 
+
+# and plot the tes tmse data
+# find ylims
+y_min <- 0.9* min(c(rf.boston.p$test$mse, rf.boston.p2$test$mse, rf.boston.psq$test$mse))
+y_max <- 1.1* max(c(rf.boston.p$test$mse, rf.boston.p2$test$mse, rf.boston.psq$test$mse))
+
+plot(1:500, rf.boston.p$test$mse, col="green", type="l", xlab="# trees", ylab="test mse", ylim=c(y_min,y_max))
+lines(1:500, rf.boston.p2$test$mse, col="red", type="l")
+lines(1:500, rf.boston.psq$test$mse, col="blue", type="l")
+legend("topright", c("m=p", "m=p/2", "m=sqrt(p)"), col=c("green", "red", "blue"), cex=1, lty=1)
+
+```
+
+We observe that `m=sqrt(p)` yields slightly better results compard to `m=p/2`
+
+If we use another split between train and test , we can different test mse values . For instance for 4/5, 1/5 split the test mse would be around 6.

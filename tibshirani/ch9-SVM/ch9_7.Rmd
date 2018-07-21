@@ -1,0 +1,88 @@
+---
+title: "ch9-EX7"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+require(ISLR)
+require(e1071)
+```
+
+###a
+```{r}
+data(Auto)
+mpgh <- ifelse(Auto$mpg > median(Auto$mpg), 1,0)
+Auto <- data.frame(Auto, mpgh=as.factor(mpgh))
+
+```
+
+###b
+
+```{r}
+set.seed(3255) 
+costs <- c(0.01, 0.1, 1,  5, 10, 100)
+tune.out <- tune(svm, mpgh ~ .  , data=Auto, kernel="linear", 
+               ranges=list(cost=costs))
+print(summary(tune.out))
+
+bestmod_lin = tune.out$best.model
+print(summary(bestmod_lin))
+
+```
+
+###c
+
+```{r}
+print("tuning radial")
+gammas <- c(0.5,1,2,3,4)
+set.seed(21)
+tune.out <- tune(svm, mpgh ~ .  , data=Auto, kernel="radial", 
+               ranges=list(cost=costs, gamma=gammas))
+print(summary(tune.out))
+
+print("best model for radial")
+bestmod_rad = tune.out$best.model
+print( summary(bestmod_rad) )
+
+```
+
+```{r}
+print("tuning polynomial")
+gammas <- c(0.5,1,2,3,4)
+degs <- c(2,3)
+set.seed(463)
+tune.out <- tune(svm, mpgh ~ . , data=Auto, kernel="polynomial", 
+               ranges=list(cost=costs, gamma=gammas, degrees=degs))
+print(summary(tune.out))
+
+print("best model for polynomail")
+bestmod_poly = tune.out$best.model
+print( summary(bestmod_poly) )
+
+```
+
+###d
+
+Define a func to iteratively plot all pairs
+```{r}
+plotpairs <- function(fit) {
+    for (name in names(Auto)[!(names(Auto) %in% c("mpg", "mpgh", "name"))]) {
+        plot(fit, Auto, as.formula(paste("mpg~", name, sep = "")))
+    }
+}
+```
+
+```{r}
+plotpairs(bestmod_lin)
+```
+
+```{r}
+plotpairs(bestmod_rad)
+```
+
+```{r}
+plotpairs(bestmod_poly)
+```
+

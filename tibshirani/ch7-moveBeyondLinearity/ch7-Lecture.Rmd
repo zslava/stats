@@ -108,12 +108,12 @@ Here we will explore cubic splines
 
 ```{r}
 require(splines)
-fit<-lm(wage~bs(age,knots=c(25,40,60)), data=Wage )
+fit<-lm(wage~bs(age,knots=c(25,40,60)), data=Wage ) #note func bs() for any-degree spline  ns() for natural cubic splines 
 plot(age,wage, col="darkgrey")
 lines(age.grid, predict(fit, list(age=age.grid)),col="darkgreen",lwd=2 )
 abline(v=c(25,50,60), lty=2, col="darkgreen" )
 summary(fit)
-fit <- smooth.spline(age,wage, df=16) # knots an be undefined for smooth.spline
+fit <- smooth.spline(age,wage, df=16) # knots can be undefined for smooth.spline
 lines(fit,col="red", lwd=2)
 fit<- smooth.spline(age,wage, cv=TRUE)  # using cross-validation to find df param
 lines(fit, col="purple", lwd=2)
@@ -159,10 +159,11 @@ The p-value = 0.82 is high so a polynomial for `year` is not necessary.
 One nice feature of the `gam` pkg  is that it knows how to plot the functions nicely even for models fit by `lm` or `glm`.
 
 ```{r fig.width=10, fig.height=5}
+
 par(mfrow=c(1,3))
 lm1 <- lm(wage~ns(age,df=4)+ns(year,df=4)+education
           ,data=Wage )
-plot.gam(lm1,se=TRUE)
+plot.Gam(lm1)
 ```
 
 

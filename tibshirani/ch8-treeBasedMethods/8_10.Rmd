@@ -1,0 +1,109 @@
+---
+title: "ex 8_10"
+author: "S Zimine"
+
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(ISLR)
+require(gbm)
+data(Hiters)
+```
+
+#### a
+
+```{r}
+##clean data
+sum(is.na(Hitters))
+Hitters <- na.omit(Hitters) ## removing NAs
+sum(is.na(Hitters))
+
+```
+
+### b
+
+```{r}
+
+nfeats <- dim(Hitters)[2] -1
+nsamp <-  dim(Hitters)[1]
+train <- 1:200 #250 / 150 split
+test <- (1:nsamp)[-train]
+```
+
+### c
+
+
+```{r}
+set.seed(103)
+pows = seq(-10, -0.2, by = 0.1)
+lambdas = 10^pows
+length.lambdas = length(lambdas)
+train.errors = rep(NA, length.lambdas)
+test.errors = rep(NA, length.lambdas)
+for (i in 1:length.lambdas) {
+  boost.hitters <- gbm(Salary ~ ., data=Hitters[train,] , distribution="gaussian",
+                       n.trees=1000, shrinkage = lambdas[i], interaction.depth = 1)
+  train.pred <- predict(boost.hitters, Hitters[train,], n.trees=1000 )
+  test.pred <- predict(boost.hitters, Hitters[test,], n.trees=1000 )
+  train.errors[i] <- mean( (Hitters[train,]$Salary - train.pred)^2  )
+  test.errors[i] <- mean( (Hitters[test,]$Salary - test.pred)^2  )
+}
+#plotting
+plot(lambdas, train.errors, type="b", xlab="shrinkage (lambda)", ylab = "train MSE", col="blue", pch=20)
+```
+
+### d 
+```{r}
+plot(lambdas, test.errors, type="b", xlab="shrinkage (lambda)", ylab = "test MSE", col="red", pch=20)
+print(paste("boosting best test mse ", min(test.errors)))
+best_lambda <- lambdas[which.min(test.errors)]
+best_lambda
+```
+
+#### e 
+```{r}
+## linear regression full model
+lm.fit <- lm(Salary ~ ., data=Hitters[train,])
+lm.pred <- predict(lm.fit, Hitters[test,])
+lm.test.mse <- mean( (Hitters[test,]$Salary  - lm.pred)^2   )
+print(paste("OLS test mse full model", lm.test.mse))
+
+### lasso
+library(glmnet)
+set.seed(134)
+x <- model.matrix(Salary ~ . , data=Hitters[train,])
+y <- Hitters[train,]$Salary
+x.test <- model.matrix(Salary ~ . , data=Hitters[test,])
+lasso.fit <- glmnet(x,y, alpha=1) #lasso
+lasso.pred <- predict(lasso.fit, s=0.01, newx = x.test)
+lasso.test.mse <- mean( (Hitters[test,]$Salary - lasso.pred)^2)
+print(paste("lasso regularisation test mse", lasso.test.mse))
+```
+Linear regression and regularisation like lasso have higher test MSE then boosting almost by a factor of two
+
+### f
+
+```{r}
+boost.best <-  gbm(Salary ~ ., data=Hitters[train,] , distribution="gaussian",
+                       n.trees=1000, shrinkage = best_lambda, interaction.depth = 1)
+summary(boost.best)
+```
+
+`CHmRun`, `Walks` and `CatBat` are the three most important variables.
+
+
+### g
+```{r}
+require(randomForest)
+bag.hitters <- randomForest(Salary~., data=Hitters[train,], mtry=nfeats, tree=500, importance=T) #m=p is a bagging 
+bag.pred <- predict(bag.hitters, Hitters[test,])
+bag.test.mse <- mean( (Hitters[test,]$Salary - bag.pred)^2 )
+print(paste("bagging test mse", bag.test.mse))
+
+```
+Bagging test MSE is very similar to boosting test.mse

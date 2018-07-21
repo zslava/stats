@@ -1,0 +1,287 @@
+---
+title: "ch9 Lab"
+author: "S Zimine"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Support Vefctor Classifier
+===========================
+
+The `svm()` from `e1071` for classfier uses param `kernel="linear`,  `cost` argument when small then the margin will be wide and vice versa.
+
+```{r}
+require(e1071)
+#construct a 2 dimensional example 
+set.seed(1)
+x<-matrix(rnorm(20*2),ncol=2) # 20x2 matrix of N(0,1) points
+y <- c(rep(-1,10), rep(1,10))
+x[y==1,] <- x[y==1,] + 1  # move mean to  1 to 2nd half of lines in the matrix
+plot(x, col=(3-y), pch=19) #first half of matrix lines is blue, 2nd half is red
+```
+
+```{r}
+#prepare a dataset data frame
+dat <- data.frame(x=x, y=as.factor(y))
+require(e1071)
+cst <- 10
+
+svmfit <- svm(y~., data=dat, kernel="linear", cost=cst, scale=FALSE) #x1,x2 are on the same scale
+plot(svmfit,dat)
+```
+
+The `x` denote  the support vectors defining the separation hyperplane.
+Note that x,y are inverted in svmfit plot compared to the original x plot `plot(x, col=(3-y), pch=19` 
+
+```{r}
+print(summary(svmfit))
+print("support vectors")
+print( svmfit$index)
+
+```
+
+
+Lets change the cost value 
+
+```{r}
+cst <- 0.1
+svmfit <- svm(y~., data=dat, kernel="linear", cost=cst, scale=FALSE) #x1,x2 are on the same scale
+plot(svmfit,dat)
+print( svmfit$index)
+```
+
+As expected with larger constrained budjet `C` there are more support vectors as soft margins are larger.
+
+
+
+We can run cross-validation with a set of `cost param`
+```{r}
+set.seed(1)
+tune.out <- tune(svm, y~., data=dat, kernel="linear", ranges=list(cost=c(0.001, 0.01, 0.1, 1.5, 10,100)))
+print(summary(tune.out))
+#we see that cost=0.1 has the lowest error rate
+bestmod = tune.out$best.model
+print( summary(bestmod) )
+```
+
+Lets check prediction and `bestmod` model accuracy on our test data set
+which we generate
+```{r}
+xtest <- matrix(rnorm(20*2),ncol=2)
+ytest <- sample(c(-1,1), 20, rep=TRUE)
+xtest[ytest==1,] <- xtest[ytest==1,] + 1
+#let see data and test data side by side
+par(mfrow=c(1,2))
+plot(x, col=(3-y), pch=19)
+plot(xtest, col=(3-ytest), pch=19)
+par(mfrow=c(1,1))
+
+testdat <- data.frame(x=xtest,y=as.factor(ytest))
+ypred <- predict(bestmod,testdat)
+cm <- table(predict=ypred, truth=testdat$y)
+print(cm)
+print(paste("bestmod svm accuracy:", sum(diag(cm))/sum(cm) ))
+```
+
+Now consider the case where two classes are linearly separable
+separate two classes further 
+```{r}
+
+
+x[y==1,] <- x[y==1,] + 0.5
+plot(x, col=(y+5)/2, pch=19) #first half of matrix lines is blue, 2nd half is red
+dat <- data.frame(x=x, y=as.factor(y))
+
+cst <- 1e5 #high cost small margins
+svmfit <- svm(y~., data=dat, kernel="linear", cost=cst, scale=FALSE) #x1,x2 are on the same scale
+plot(svmfit,dat)
+print(summary(svmfit))
+```
+
+
+Lets check the accuracy of this model on test data also more separated. Prepare test data.
+
+```{r}
+
+xtest[ytest==1,] <- xtest[ytest==1,] + 0.5
+
+par(mfrow=c(1,2))
+plot(x,col=(y+5)/2,pch=19)
+plot(xtest,col=(ytest+5)/2,pch=19)
+par(mfrow=c(1,1))
+
+testdat <- data.frame(x=xtest,y=as.factor(ytest))
+
+ypred <- predict(svmfit, testdat)
+cm <- table(predict=ypred, truth=testdat$y)
+print(cm)
+print(paste("cost 1e5 svm accuracy on separable classes :", sum(diag(cm))/sum(cm) ))
+
+```
+
+Support Vector Machine
+=======================
+
+Lets study non-linear kernels 
+
+```{r}
+set.seed(1)
+# 200x2 matrix
+x<-matrix(rnorm(200*2),ncol=2)
+x[1:100,] <- x[1:100,] + 2 #first half of lines strongly separated
+x[101:150,] <- x[101:150,] -2 #next 50 lines also separated but in opposite direction
+y<-c(rep(1,150), rep(2,50))
+dat<-data.frame(x=x,y=as.factor(y))
+
+plot(x,col=y, pch=19)
+
+```
+
+Lets see the svm fit with radial kernel
+
+```{r}
+train <- sample(1:nrow(dat),nrow(dat)/2) #half half
+cst <- 1
+svmfit <- svm(y~., data=dat[train,], kernel="radial", cost=cst, gamma=1) 
+
+plot(svmfit,dat[train,])
+summary(svmfit)
+```
+
+
+Lets see the svm fit with polynomial kernel
+
+```{r}
+cst <- 1
+svmfit.po <- svm(y~., data=dat[train,], kernel="polynomial", degree=10, cost=cst) 
+
+plot(svmfit.po,dat[train,])
+summary(svmfit.po)
+```
+
+We see the polynomial kernel does not do the job 
+
+If you reduce margin, the decision boundary becomes more irregular
+```{r}
+cst <- 1e5
+svmfit <- svm(y~., data=dat[train,], kernel="radial", cost=cst, gamma=1) 
+plot(svmfit,dat[train,])
+```
+
+Lets do the cross-validation with  radial kernel
+```{r}
+set.seed(1)
+tune.out <- tune(svm, y~., data=dat[train,], kernel="radial",
+             ranges=list(cost=c(0.1, 1,10,100,1000),
+             gamma=c(0.5,1,2,3,4)) )
+print(summary(tune.out))
+
+#best params choice cost=1 gamma=2
+
+cm <- table(true=dat[-train,"y"], pred=predict(tune.out$best.model ,newdata=dat[-train,]))
+print(cm)
+print(paste("radial cost=1 gamma=2 svm accuracy:", sum(diag(cm))/sum(cm) ))
+
+```
+
+Check the Very high accurancy
+
+ROC curves
+===========
+
+```{r}
+require(ROCR)
+#define a func to make roc plot
+rocplot <- function(pred,truth, ...){
+    predob <- prediction(pred,truth)
+    perf <- performance(predob, "tpr", "fpr")
+    plot(perf,...)
+}
+```
+
+```{r}
+svmfit.opt <- svm(y ~ . ,data=dat[train,], kernel="radial", gamma=2, cost=1  )
+pred <- predict(svmfit.opt, dat[train,], decision.values = TRUE) 
+fitted <- attributes(pred)$decision.values 
+
+par(mfrow=c(1,2))
+
+rocplot(fitted, dat[train,"y"], main="Training Data")
+
+#lets increase gamma to 50
+svmfit.flex <- svm(y ~ . ,data=dat[train,], kernel="radial", gamma=50, cost=1  )
+pred <- predict(svmfit.flex, dat[train,], decision.values = TRUE) 
+fitted <- attributes(pred)$decision.values 
+rocplot(fitted, dat[train,"y"], add=T, col="red")
+
+#lets check roc on test data 
+tpred <- predict(svmfit.opt, dat[-train,], decision.values = TRUE) 
+fitted <- attributes(tpred)$decision.values 
+rocplot(fitted, dat[-train,"y"], main="Test Data")
+
+tpred <- predict(svmfit.flex, dat[-train,], decision.values = TRUE) 
+fitted <- attributes(tpred)$decision.values 
+rocplot(fitted, dat[-train,"y"], add=T, col="red")
+
+```
+
+We see that on test data the best results are with $\gamma=2$.
+
+SVM with Multiple Classes
+==========================
+
+Lets add a 3rd class
+```{r}
+set.seed(1)
+x<-rbind(x,matrix(rnorm(50*2),ncol=2)) #more 50 lines
+y<-c(y,rep(0,50))
+x[y==0,2] <- x[y==0,2] + 2
+
+dat <- data.frame(x=x,y=as.factor(y))
+par(mfrow=c(1,1))
+plot(x,col=(y+1))
+
+#now lets fit
+svmfit <- svm(y~., data=dat, kernel="radial", cost=10, gamma=1)
+plot(svmfit,dat)
+```
+
+Application to Gene Expression Data
+===================================
+
+```{r}
+require(ISLR)
+data(Khan)  #  63 rows, 2308 features
+print(names(Khan))
+print(dim(Khan$xtrain))
+print(dim(Khan$xtest))
+
+#ytrain, ytest contain cancer subtype
+print(table(Khan$ytrain))
+print(table(Khan$ytest))
+```
+
+```{r}
+dat <- data.frame(x=Khan$xtrain, y=as.factor(Khan$ytrain))
+out <- svm(y~., data=dat, kernel="linear", cost=10)
+print(summary(out))
+```
+
+Lets check confusion matrix on train and test data
+```{r}
+cm <- table(out$fitted, dat$y)
+print( cm ) #no training errors
+print(paste("gene train data accuracy:", sum(diag(cm))/sum(cm) ))
+
+#lets check prediction on test data
+dat.te <- data.frame(x=Khan$xtest, y=as.factor(Khan$ytest))
+pred.te <- predict(out, dat.te)
+cm <- table(pred.te, dat.te$y)
+print( cm )
+print(paste("gene test data accuracy:", sum(diag(cm))/sum(cm) ))
+```
+
+2 errors on test data with `cost=10`

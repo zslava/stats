@@ -1,0 +1,121 @@
+---
+title: "Ch9 EX 5"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+require(glmnet)
+require(e1071)
+set.seed(421)
+```
+
+###a)
+```{r}
+n<-500
+p<-2
+x1<-runif(n)-0.5
+x2<-runif(n)-0.5
+y<- (x1^2 - x2^2 >0) 
+yy<-rep(-1,length(y))
+yy[which(y==T)] <- 1
+
+dat <- data.frame(x1,x2,y=as.factor(yy) )
+
+```
+
+###b)
+```{r}
+plot(x1,x2,col=(3-yy),pch=20)
+```
+
+###c)
+```{r}
+train <- sample(n, n/2)
+test <- (1:n)[-train]
+dat_train <- dat[train,]
+dat_test <- dat[test,]
+fit_logi <- glm(y~., data=dat, family=binomial)
+```
+
+###d)
+```{r}
+yhat <- predict(fit_logi, dat_train, type="response")
+
+ypred <- rep(-1, length(yhat))
+ypred[which(yhat>0.528)] <- 1  # median from summary(yhat)
+
+#we obtain a a linear boundary
+plot(as.matrix(dat_train[,1:2]), col=(3-ypred) )
+```
+With logistic regresion on Linear X1 and X2 we have a linear wrong separation border
+
+### e
+```{r}
+fit_logi_nl <-glm(y ~ poly(x1,2) + poly(x2,2) + I(x1*x2) , data=dat, family=binomial)
+```
+
+#### f
+```{r}
+yhat <- predict(fit_logi_nl, dat_train, type="response")
+ypred <- rep(-1, length(yhat))
+ypred[which(yhat>0.5)] <- 1
+
+##now we have a non-linear boundary
+plot(as.matrix(dat_train[,1:2]), col=(3-ypred) )
+
+
+cm <- table(predict=ypred, truth=dat_train$y)
+print(cm)
+lbl <- "logistic on non-linear x1 and x2,  train error"
+print(paste(lbl, 1 - sum(diag(cm))/sum(cm) ))
+
+```
+
+Plot shows  we have a non-linear boundary for logistic regression on non-linear functions for X1 and X2
+
+### g)
+```{r}
+cst <-10
+svmfit <- svm(y ~ . , data=dat, kernel="linear",cost=cst)
+
+#boundary
+plot(svmfit, dat_train, main="train")
+
+yhat <- predict(svmfit, dat_train)
+ypred <- rep(-1, length(yhat))
+ypred[which(yhat=="1")] <- 1
+
+plot(as.matrix(dat_train[,1:2]), col=(3-ypred) )
+
+```
+
+We observe that linear classifier does not find the boundary
+
+
+#### h )
+```{r}
+svmfit <- svm(y ~ . , data=dat, kernel="radial",cost=cst, gamma=1)
+
+plot(svmfit, dat_train, main="train")
+
+yhat <- predict(svmfit, dat_train)
+ypred <- rep(-1, length(yhat))
+ypred[which(yhat=="1")] <- 1
+
+plot(as.matrix(dat_train[,1:2]), col=(3-ypred) )
+
+cm <- table(predict=ypred, truth=dat_train$y)
+print(cm)
+lbl <- "svm non-linear kernel,  train error"
+print(paste(lbl, 1 - sum(diag(cm))/sum(cm) ))
+```
+
+####i )
+
+We observe that logicstic regresssion on non-linear functions of x1 and x2 finds a correct  non-linear boundaries,  
+
+NB:
+This experiment enforces the idea that SVMs with non-linear kernel are extremely powerful in finding non-linear boundary. Both, logistic regression with non-interactions and SVMs with linear kernels fail to find the decision boundary. Adding interaction terms to logistic regression seems to give them same power as radial-basis kernels. However, there is some manual efforts and tuning involved in picking right interaction terms. This effort can become prohibitive with large number of features. Radial basis kernels, on the other hand, only require tuning of one parameter - gamma - which can be easily done using cross-validation.
+

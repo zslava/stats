@@ -90,7 +90,7 @@ plot(gam2)
 par(mfrow=c(1,3))
 lm1 <- lm(wage~ns(age,df=4)+ns(year,df=4)+education
           ,data=Wage )
-plot.gam(lm1,se=TRUE)
+plot.Gam(lm1,se=TRUE)
 
 
 print("***** quiz *****")

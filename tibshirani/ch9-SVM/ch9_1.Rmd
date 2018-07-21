@@ -1,0 +1,25 @@
+---
+title: "ch9_Ex1"
+author: "S Zimine"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+x1 <- -10:10
+x2 <- 1 + 3*x1
+plot(x1,x2,type="l", col="red", ylim=range(x1), main="hyperplanes as lines in 2D")
+abline(v=0,  lty="dotted")
+abline(h=0,  lty="dotted")
+text(c(5), c(-5), "greater than 0", col = "red")
+text(c(-8), c(-5), "less than 0", col = "red")
+x2_p <- 1 - 0.5*x1
+lines(x1,x2_p, type="l", col="blue")
+text(c(5), c(3), "greater than 0", col = "blue")
+text(c(-8), c(3), "less than 0", col = "blue")
+legend("topright", c("x2=1 + 3 * x1", "x2=1 - 0.5*x1"),col=c("red", "blue"), cex=1, lty=1 )
+```
+

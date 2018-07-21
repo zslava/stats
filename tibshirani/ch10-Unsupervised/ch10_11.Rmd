@@ -1,0 +1,46 @@
+---
+title: "ch10 ex11"
+output:
+  html_document:
+    df_print: paged
+---
+
+### a
+
+```{r}
+x <- read.csv(file="Ch10Ex11.csv", header=F)
+```
+
+### b
+
+```{r}
+distcor <- as.dist(1-cor(x))
+hc.comp <- hclust(distcor, method="complete")
+plot(hc.comp)
+
+hc.sing <- hclust(distcor, method="single")
+plot(hc.sing)
+
+hc.avg <- hclust(distcor, method="average")
+plot(hc.avg)
+
+```
+
+best 2 classes are obtained with `complete` linkage method.
+
+### c
+
+```{r}
+pr.out = prcomp(t(x))
+summary(pr.out)
+
+total_load = apply(pr.out$rotation, MARGIN=1, sum)
+indices = order(abs(total_load), decreasing=T)
+indices[1:10]
+
+total_load[indices[1:10]]
+```
+
+This shows one representation of the top 1% of differing genes.
+
+

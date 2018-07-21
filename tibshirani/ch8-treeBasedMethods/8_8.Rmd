@@ -1,0 +1,83 @@
+---
+title: "ch8 ex8"
+
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Ex 8
+=====
+```{r}
+require(ISLR)
+require(tree)
+data(Carseats)
+```
+
+### a)
+```{r}
+set.seed(1011)
+nfeats <- dim(Carseats)[2] -1
+nsamp <-  dim(Carseats)[1]
+train <- sample( 1:nsamp, size=250) #250 / 150 split
+test <- (1:nsamp)[-train]
+```
+
+### b)
+```{r}
+tree.carseats <- tree(Sales~., data=Carseats[train,])
+plot(tree.carseats)
+text(tree.carseats,pretty=0)
+tree.pred <- predict(tree.carseats, Carseats[test,])
+test.mse <- mean( (Carseats[test,]$Sales - tree.pred)^2 )
+print(paste("full tree test mse", test.mse))
+
+```
+
+### c
+```{r}
+cv.carseats <- cv.tree(tree.carseats, FUN=prune.tree)
+plot(cv.carseats$size, cv.carseats$dev, type="b") #best value at 16
+prune.carseats <- prune.tree(tree.carseats, best=16)
+plot(prune.carseats)
+text(prune.carseats,pretty=0)
+
+tree.pred <- predict(prune.carseats, Carseats[test,])
+test.mse <- mean( (Carseats[test,]$Sales - tree.pred)^2 )
+print(paste("pruned tree test mse", test.mse))
+```
+
+Prunning did a tiny improvement of the test mse
+
+
+#### d)
+
+```{r}
+require(randomForest)
+bag.carseats <- randomForest(Sales~.,data=Carseats[train,], mtry=nfeats, tree=500, importance=T) #m=p is a bagging case of RandomForest
+bag.pred <- predict(bag.carseats, Carseats[test,])
+test.mse <- mean( (Carseats[test,]$Sales - bag.pred)^2 )
+print(paste("bagging test mse", test.mse))
+
+print( importance(bag.carseats))
+
+```
+
+Bagging reduces significantly the test mse.
+
+The most significat featatures to predict $\tt{Sales}$  are: $\tt{Price}$, $\tt{ShelveLoc}$, $\tt{Age}$.
+
+
+#### e)
+```{r}
+rf.carseats = randomForest(Sales~., data=Carseats[train,], mtry=5, ntree=500, importance=T)
+rf.pred = predict(rf.carseats, Carseats[test,])
+test.mse  = mean((Carseats[test,]$Sales - rf.pred)^2)
+print( importance(rf.carseats) )
+print(paste("random forest test mse", test.mse))
+```
+
+In this data set RF slightly increased the test mse
+

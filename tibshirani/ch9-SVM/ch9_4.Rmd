@@ -1,0 +1,115 @@
+---
+title: "ch9 EX 4"
+output:
+  html_document:
+    df_print: paged
+---
+
+Generate data
+```{r}
+require(e1071)
+#generate the train data
+set.seed(131)
+ns <- 100
+
+#x<-matrix(rnorm(ns*2),ncol=2)
+#y<- c( rep(-1,ns/2) , rep(1,ns/2) )
+#x[y==1,] <- x[y==1,] + 0.5
+#plot(x, col=(3-y), pch=19)
+#dat <- data.frame(x=x, y=as.factor(y))
+
+#we replace the above the geneated data which a clear quadratic separation
+
+x1 <- rnorm(ns)
+x2 <-  2 + x1^2 + rnorm(ns) #quadratic dependency
+x2[1:(ns/2)] <- x2[1:(ns/2)] + 2  #seperate two half s up and down
+x2[(ns/2+1):ns] <- x2[(ns/2+1):ns] - 2
+y<- c( rep(-1,ns/2) , rep(1,ns/2) )
+
+dat <- data.frame(x1,x2,y=as.factor(y))
+#divide to train and test sets half half
+train <- c(sample(1:(ns/2), ns/4), sample( (ns/2+1):ns, ns/4) )
+test  <- (1:ns)[-train]
+
+dat_train <- dat[train,]
+dat_test  <- dat[test,]
+```
+
+```{r}
+## visual check data 
+par(mfrow=c(1,2))
+plot(as.matrix(dat[train,1:2]), col=(3-y[train]), main="train" )
+plot(as.matrix(dat[test,1:2]), col=(3-y[test]), main="test" )
+
+```
+
+
+
+Check train errors
+
+```{r}
+cst <- 10
+svm_lin <- svm(y~., data=dat_train , kernel="linear", cost=cst, scale=FALSE)
+
+cm <- table(fit=svm_lin$fitted, truth=dat_train$y)
+print(cm)
+print(paste("svm linear train errror", 1 - sum(diag(cm))/sum(cm) ))
+
+#polynomial
+svm_poly <- svm(y~., data=dat_train , kernel="polynomial", degrees=4, cost=cst, scale=FALSE)
+cm <- table(fit=svm_poly$fitted, truth=dat_train$y)
+print(cm)
+print(paste("svm polynomial train error:", 1 - sum(diag(cm))/sum(cm) ))
+
+#radial
+svm_rad <- svm(y~., data=dat_train , kernel="radial", cost=cst, gamma=1)
+cm <- table(fit=svm_rad$fitted, truth=dat_train$y)
+print(cm)
+print(paste("svm radial train error:", 1- sum(diag(cm))/sum(cm) ))
+```
+
+We observe that the lowest training error is with radial kernel
+
+lets check the train plots
+```{r}
+plot(svm_lin, dat_train, main="linear")
+plot(svm_poly, dat_train, main="polynomial")
+plot(svm_rad, dat_train, main = "radial")
+
+```
+
+###Verify models on test data
+
+Compute predictions and print confusion matrices and test error rates 
+
+```{r}
+##linear predict on test
+lbl <- "svm linear test error"
+yhat <- predict(svm_lin, dat_test)
+cm <- table(predict=yhat, truth=dat_test$y)
+print(cm)
+print(paste(lbl, 1 - sum(diag(cm))/sum(cm) ))
+
+##polynomial predict on test
+lbl <- "svm polynomial test error"
+yhat <- predict(svm_poly, dat_test)
+cm <- table(predict=yhat, truth=dat_test$y)
+print(cm)
+print(paste(lbl, 1 - sum(diag(cm))/sum(cm) ))
+
+##radial predict on test
+lbl <- "svm radial test error"
+yhat <- predict(svm_rad, dat_test)
+cm <- table(predict=yhat, truth=dat_test$y)
+print(cm)
+print(paste(lbl, 1 - sum(diag(cm))/sum(cm) ))
+
+```
+
+On test data separating borders will be the same.
+
+We obseve that on the test data  test error is higher than on the train data 
+However the polynomial or radial kernel continue to perform better than a linear kernel. Radial data is the best.
+
+
+

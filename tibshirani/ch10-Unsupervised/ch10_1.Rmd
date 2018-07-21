@@ -1,0 +1,27 @@
+---
+title: "ch10 ex7"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+data(USArrests)
+
+dsc = scale(USArrests)
+
+a = dist(dsc)^2
+b = as.dist(1 - cor(t(dsc)))
+
+hc_a <- hclust(a) #method="complete"
+hc_b <- hclust(b)
+summary(b/a)
+```
+
+```{r}
+par(mfrow=c(1,2))
+plot(hc_a, main="euclidian distance")
+plot(hc_b, main="correlation distance")
+```
+
+

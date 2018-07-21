@@ -1,0 +1,102 @@
+---
+title: "8_9"
+author: "S Zimine"
+
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(ISLR)
+require(tree)
+data(OJ)
+str(OJ)
+```
+
+
+### a
+```{r}
+set.seed(1013)
+nfeats <- dim(OJ)[2] -1
+nsamp <-  dim(OJ)[1]
+train <- sample( 1:nsamp, size=800) #250 / 150 split
+test <- (1:nsamp)[-train]
+```
+
+#### b
+```{r}
+tree.oj <- tree(Purchase~., data=OJ[train,] )
+summary(tree.oj)
+```
+
+Variables actually used in the tree constructions are: "LoyalCH"   "PriceDiff"
+Training error reported (misclassification error ate) = 0.11
+
+
+#### c
+```{r}
+print(tree.oj)
+```
+
+Let's pick terminal node labeled "10)". The splitting variable at this node is $\tt{PriceDiff}$. The splitting value of this node is $0.05$. There are $79$ points in the subtree below this node. The deviance for all points contained in region below this node is $76.79$. * in the line denotes that this is in fact a terminal node. The prediction at this node is $\tt{Sales}$ = $\tt{MM}$. About $19$% points in this node have $\tt{CH}$ as value of $\tt{Sales}$. Remaining $81$% points have $\tt{MM}$ as value of $\tt{Sales}$.
+
+##### d
+```{r}
+plot(tree.oj)
+text(tree.oj,pretty=0)
+```
+
+`LoyalCH` is the most imporant variable of the tree. Top 3 nodes contain `LoyalCH`
+
+#### e
+
+```{r}
+oj.pred <- predict(tree.oj, OJ[test,],type="class") #classification
+cm <- table(OJ[test,]$Purchase, oj.pred)
+print(cm)
+accuracy <- sum(diag(cm))/sum(cm)
+errorrate <- 1 - accuracy
+errorrate
+```
+
+#### f  g
+```{r}
+cv.oj <- cv.tree(tree.oj, FUN=prune.tree)
+print(cv.oj)
+#str(cv.oj)
+plot(cv.oj$size, cv.oj$dev, type ="b", xlab = "tree size", ylab="deviance")
+```
+
+### h 
+
+Cross validation indicates that tree size = 6 has the lowest deviance
+
+
+###  i
+```{r}
+prune.oj <- prune.tree(tree.oj,best=6)
+#plot(prune.oj)
+```
+
+### j
+```{r}
+summary(tree.oj)
+summary(prune.oj)
+```
+misclassification error is exactly the same between original and pruned tree
+
+
+### k
+```{r}
+prune.oj.pred <- predict(prune.oj, OJ[test,],type="class") #classification
+cmp <- table(OJ[test,]$Purchase, prune.oj.pred)
+accuracy <- sum(diag(cmp))/sum(cmp)
+errorrate <- 1 - accuracy
+#for pruned
+errorrate
+```
+
+Test error rate  are also the same between original and unpruned trees  at 0.189
